@@ -240,7 +240,7 @@ export default function LessonAuthor({ user, classId }: LessonAuthorProps) {
       }
       
     } catch (error) {
-      alert('Error importing lesson: ' + error.message);
+      alert('Error importing lesson: ' + (error instanceof Error ? error.message : String(error)));
     }
   };
 
