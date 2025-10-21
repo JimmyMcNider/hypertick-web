@@ -253,15 +253,15 @@ export default function LessonAuthor({ user, classId }: LessonAuthorProps) {
     <author>${lesson.author}</author>
     <version>${lesson.version}</version>
     <duration>${lesson.estimatedDuration}</duration>
-    <difficulty>${lesson.metadata.difficulty}</difficulty>
+    <difficulty>${lesson.difficulty}</difficulty>
     <category>${lesson.metadata.category}</category>
   </metadata>
   <scenarios>
-    ${lesson.scenarios.map(scenario => `
+    ${Object.entries(lesson.scenarios).map(([key, scenario]) => `
     <scenario id="${scenario.id}" name="${scenario.name}">
       <description>${scenario.description}</description>
       <securities>
-        ${scenario.securities.map(symbol => `<security symbol="${symbol}" initialPrice="${scenario.initialPrices[symbol] || 50.00}"/>`).join('\n        ')}
+        ${scenario.initialState.enabledSymbols.map(symbol => `<security symbol="${symbol}" initialPrice="${scenario.initialState.initialPrices[symbol] || 50.00}"/>`).join('\n        ')}
       </securities>
       <commands>
         ${scenario.commands.map(cmd => `
