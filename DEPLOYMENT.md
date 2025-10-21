@@ -1,8 +1,8 @@
 # HyperTick Production Deployment Guide
 
-## Render.com Deployment
+## Render + Supabase Deployment
 
-This guide covers deploying HyperTick to Render.com with PostgreSQL and Redis for production use.
+This guide covers deploying HyperTick using Render for hosting and Supabase for the database (permanent free tier).
 
 ### Prerequisites
 
