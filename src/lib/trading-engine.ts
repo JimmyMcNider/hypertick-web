@@ -271,15 +271,15 @@ export class TradingEngine extends EventEmitter {
       // Create order in database
       const dbOrder = await prisma.order.create({
         data: {
-          sessionUserId: sessionUser.id,
-          symbol: orderData.symbol,
+          sessionId: sessionId,
+          userId: userId,
+          securityId: 'sec_' + orderData.symbol, // Generate security ID from symbol
           side: orderData.side,
           type: orderData.type,
           quantity: orderData.quantity,
           price: orderData.price,
           timeInForce: orderData.timeInForce || 'DAY',
-          status: 'PENDING',
-          filledQuantity: 0
+          status: 'PENDING'
         }
       });
 
