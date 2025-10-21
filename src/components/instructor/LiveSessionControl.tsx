@@ -146,7 +146,7 @@ export default function LiveSessionControl({ user, classId }: LiveSessionControl
         alert('Error starting session: ' + error.error);
       }
     } catch (error) {
-      alert('Error starting session: ' + error.message);
+      alert('Error starting session: ' + (error instanceof Error ? error.message : String(error)));
     } finally {
       setLoading(false);
     }
@@ -178,7 +178,7 @@ export default function LiveSessionControl({ user, classId }: LiveSessionControl
         });
       }
     } catch (error) {
-      alert('Error pausing session: ' + error.message);
+      alert('Error pausing session: ' + (error instanceof Error ? error.message : String(error)));
     } finally {
       setLoading(false);
     }
@@ -210,7 +210,7 @@ export default function LiveSessionControl({ user, classId }: LiveSessionControl
         });
       }
     } catch (error) {
-      alert('Error resuming session: ' + error.message);
+      alert('Error resuming session: ' + (error instanceof Error ? error.message : String(error)));
     } finally {
       setLoading(false);
     }
@@ -246,7 +246,7 @@ export default function LiveSessionControl({ user, classId }: LiveSessionControl
         });
       }
     } catch (error) {
-      alert('Error stopping session: ' + error.message);
+      alert('Error stopping session: ' + (error instanceof Error ? error.message : String(error)));
     } finally {
       setLoading(false);
     }

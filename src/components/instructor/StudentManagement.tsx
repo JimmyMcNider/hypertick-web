@@ -101,7 +101,7 @@ export default function StudentManagement({ user, classId }: StudentManagementPr
         alert('Error adding student: ' + error.error);
       }
     } catch (error) {
-      alert('Error adding student: ' + error.message);
+      alert('Error adding student: ' + (error instanceof Error ? error.message : String(error)));
     }
   };
 
@@ -145,7 +145,7 @@ export default function StudentManagement({ user, classId }: StudentManagementPr
         alert('Error importing students: ' + error.error);
       }
     } catch (error) {
-      alert('Error parsing import data: ' + error.message);
+      alert('Error parsing import data: ' + (error instanceof Error ? error.message : String(error)));
     }
   };
 
@@ -278,7 +278,7 @@ export default function StudentManagement({ user, classId }: StudentManagementPr
         setImportFormat('manual_csv');
       }
     } catch (error) {
-      alert('Error reading file: ' + error.message);
+      alert('Error reading file: ' + (error instanceof Error ? error.message : String(error)));
     }
   };
 
@@ -308,7 +308,7 @@ export default function StudentManagement({ user, classId }: StudentManagementPr
         alert('Error removing students: ' + error.error);
       }
     } catch (error) {
-      alert('Error removing students: ' + error.message);
+      alert('Error removing students: ' + (error instanceof Error ? error.message : String(error)));
     }
   };
 
