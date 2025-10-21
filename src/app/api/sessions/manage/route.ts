@@ -65,7 +65,7 @@ export const GET = requireAuth(async (request: NextRequest & { user: any }) => {
     let filteredSessions = activeSessions;
     if (request.user.role === 'INSTRUCTOR') {
       // Get instructor's classes
-      const instructorClasses = await prisma.classes.findMany({
+      const instructorClasses = await prisma.class.findMany({
         where: { instructorId: request.user.id },
         select: { id: true }
       });
@@ -117,7 +117,7 @@ async function createEnhancedSession(lessonId: string, scenario: string, classId
   }
 
   // Verify class access
-  const classData = await prisma.classes.findFirst({
+  const classData = await prisma.class.findFirst({
     where: { 
       id: classId,
       instructorId: instructorId
