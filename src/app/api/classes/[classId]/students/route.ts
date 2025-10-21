@@ -142,40 +142,22 @@ export const POST = requireAuth(async (request: NextRequest & { user: any }, { p
         // Check if already enrolled in this class
         const existingEnrollment = await prisma.classEnrollment.findUnique({
           where: {
-            classId_userId: {
-              classId,
-              userId: user.id
+            userId_classId: {
+              userId: user.id,
+              classId
             }
           }
         });
 
         if (existingEnrollment) {
-          if (!existingEnrollment.isActive) {
-            // Reactivate enrollment
-            await prisma.classEnrollment.update({
-              where: {
-                classId_userId: {
-                  classId,
-                  userId: user.id
-                }
-              },
-              data: {
-                isActive: true,
-                canvasId: studentData.canvasId || existingEnrollment.canvasId
-              }
-            });
-            imported++;
-          } else {
-            skipped++;
-          }
+          // Student already enrolled, skip
+          skipped++;
         } else {
           // Create new enrollment
           await prisma.classEnrollment.create({
             data: {
               classId,
-              userId: user.id,
-              canvasId: studentData.canvasId,
-              isActive: true
+              userId: user.id
             }
           });
           imported++;
@@ -224,16 +206,13 @@ export const DELETE = requireAuth(async (request: NextRequest & { user: any }, {
       return NextResponse.json({ error: 'No student IDs provided' }, { status: 400 });
     }
 
-    // Deactivate enrollments instead of deleting (to preserve history)
-    const result = await prisma.classEnrollment.updateMany({
+    // Remove enrollments
+    const result = await prisma.classEnrollment.deleteMany({
       where: {
         classId,
         userId: {
           in: studentIds
         }
-      },
-      data: {
-        isActive: false
       }
     });
 
