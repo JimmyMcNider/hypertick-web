@@ -458,19 +458,21 @@ export default function LessonAuthor({ user, classId }: LessonAuthorProps) {
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Initial Prices</label>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {currentScenario?.securities.map(symbol => (
+            {currentScenario?.initialState.enabledSymbols.map(symbol => (
               <div key={symbol}>
                 <label className="block text-xs text-gray-500 mb-1">{symbol}</label>
                 <input
                   type="number"
                   step="0.01"
-                  value={currentScenario.initialPrices[symbol] || 50.00}
+                  value={currentScenario.initialState.initialPrices[symbol] || 50.00}
                   onChange={(e) => {
                     const initialPrices = {
-                      ...currentScenario.initialPrices,
+                      ...currentScenario.initialState.initialPrices,
                       [symbol]: parseFloat(e.target.value)
                     };
-                    handleUpdateScenario(selectedScenario, { initialPrices });
+                    handleUpdateScenario(selectedScenario, { 
+                      initialState: { ...currentScenario.initialState, initialPrices }
+                    });
                   }}
                   className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
