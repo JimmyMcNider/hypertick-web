@@ -36,7 +36,7 @@ export const GET = requireAuth(async (request: NextRequest & { user: any }, { pa
             xmlConfig: true
           }
         },
-        sessionUsers: {
+        users: {
           include: {
             user: {
               select: {
@@ -74,7 +74,7 @@ export const GET = requireAuth(async (request: NextRequest & { user: any }, { pa
         title: activeSession.lesson.name,
         description: activeSession.lesson.description
       } : null,
-      participants: activeSession.sessionUsers.map(sessionUser => ({
+      participants: activeSession.users.map(sessionUser => ({
         id: sessionUser.user.id,
         username: sessionUser.user.username,
         firstName: sessionUser.user.firstName,
