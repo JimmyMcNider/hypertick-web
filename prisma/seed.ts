@@ -11,6 +11,7 @@
 import { prisma } from '../src/lib/db';
 import { PRIVILEGE_DEFINITIONS } from '../src/lib/privilege-definitions';
 import { authService } from '../src/lib/auth';
+import { SecurityType } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import fs from 'fs';
 import path from 'path';
@@ -138,11 +139,11 @@ async function main() {
   // 6. Create sample securities
   console.log('📈 Creating securities...');
   const securities = [
-    { symbol: 'AOE', name: 'Alpha Omega Enterprises', type: 'EQUITY' },
-    { symbol: 'BOND1', name: '10-Year Treasury Bond', type: 'BOND' },
-    { symbol: 'BOND2', name: '5-Year Corporate Bond', type: 'BOND' },
-    { symbol: 'BOND3', name: '2-Year Municipal Bond', type: 'BOND' },
-    { symbol: 'SPX', name: 'S&P 500 Index', type: 'EQUITY' },
+    { symbol: 'AOE', name: 'Alpha Omega Enterprises', type: SecurityType.EQUITY },
+    { symbol: 'BOND1', name: '10-Year Treasury Bond', type: SecurityType.BOND },
+    { symbol: 'BOND2', name: '5-Year Corporate Bond', type: SecurityType.BOND },
+    { symbol: 'BOND3', name: '2-Year Municipal Bond', type: SecurityType.BOND },
+    { symbol: 'SPX', name: 'S&P 500 Index', type: SecurityType.EQUITY },
   ];
 
   for (const security of securities) {
