@@ -39,7 +39,7 @@ export default function AnalysisPanel({ user, sessionState, socket }: AnalysisPr
     }
   };
 
-  const data = analysisData[selectedSymbol] || analysisData['AOE'];
+  const data = analysisData[selectedSymbol as keyof typeof analysisData] || analysisData['AOE'];
 
   return (
     <div className="h-full p-3 text-xs">
