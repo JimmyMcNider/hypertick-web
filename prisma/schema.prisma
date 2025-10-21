@@ -1,0 +1,403 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User Management
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  username  String   @unique
+  firstName String
+  lastName  String
+  role      UserRole @default(STUDENT)
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  instructorClasses Class[]           @relation("InstructorClasses")
+  enrollments       ClassEnrollment[]
+  sessionUsers      SessionUser[]
+  orders            Order[]
+  positions         Position[]
+  auctions          AuctionBid[]
+  privileges        UserPrivilege[]
+  notifications     Notification[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  STUDENT
+  INSTRUCTOR
+  ADMIN
+}
+
+// Class Management
+model Class {
+  id           String   @id @default(cuid())
+  name         String
+  semester     String
+  section      String?
+  instructorId String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relationships
+  instructor  User              @relation("InstructorClasses", fields: [instructorId], references: [id])
+  enrollments ClassEnrollment[]
+  sessions    SimulationSession[]
+
+  @@map("classes")
+}
+
+model ClassEnrollment {
+  id      String @id @default(cuid())
+  userId  String
+  classId String
+
+  user  User  @relation(fields: [userId], references: [id])
+  class Class @relation(fields: [classId], references: [id])
+
+  @@unique([userId, classId])
+  @@map("class_enrollments")
+}
+
+// Lesson and Simulation Management
+model Lesson {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  xmlConfig   String   @db.Text
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relationships
+  sessions SimulationSession[]
+
+  @@map("lessons")
+}
+
+model SimulationSession {
+  id          String            @id @default(cuid())
+  lessonId    String
+  classId     String
+  scenario    String // A, B, C
+  duration    Int // seconds
+  status      SimulationStatus  @default(PENDING)
+  startTime   DateTime?
+  endTime     DateTime?
+  currentTick Int               @default(0)
+  iteration   Int               @default(1)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  // Relationships
+  lesson      Lesson         @relation(fields: [lessonId], references: [id])
+  class       Class          @relation(fields: [classId], references: [id])
+  users       SessionUser[]
+  events      SessionEvent[]
+  orders      Order[]
+  positions   Position[]
+  auctions    Auction[]
+  marketState MarketState[]
+  privileges  UserPrivilege[]
+
+  @@map("simulation_sessions")
+}
+
+enum SimulationStatus {
+  PENDING
+  IN_PROGRESS
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+model SessionUser {
+  id               String  @id @default(cuid())
+  sessionId        String
+  userId           String
+  role             String? // $Speculators, market maker, etc.
+  startingEquity   Decimal @default(100000)
+  currentEquity    Decimal @default(100000)
+  seatCosts        Decimal @default(0)
+  infoCosts        Decimal @default(0)
+  transactionCosts Decimal @default(0)
+  isActive         Boolean @default(true)
+
+  // Relationships
+  session SimulationSession @relation(fields: [sessionId], references: [id])
+  user    User              @relation(fields: [userId], references: [id])
+
+  @@unique([sessionId, userId])
+  @@map("session_users")
+}
+
+// Event System for Session Management
+model SessionEvent {
+  id         String   @id @default(cuid())
+  sessionId  String
+  command    String
+  parameters Json
+  sequence   Int
+  timestamp  DateTime @default(now())
+  processed  Boolean  @default(false)
+
+  // Relationships
+  session SimulationSession @relation(fields: [sessionId], references: [id])
+
+  @@map("session_events")
+}
+
+// Trading System
+model Security {
+  id       String        @id @default(cuid())
+  symbol   String        @unique
+  name     String
+  type     SecurityType  @default(EQUITY)
+  isActive Boolean       @default(true)
+
+  // Relationships
+  orders    Order[]
+  positions Position[]
+  prices    MarketData[]
+
+  @@map("securities")
+}
+
+enum SecurityType {
+  EQUITY
+  BOND
+  OPTION
+  DERIVATIVE
+}
+
+model Order {
+  id           String     @id @default(cuid())
+  sessionId    String
+  userId       String
+  securityId   String
+  type         OrderType
+  side         OrderSide
+  quantity     Int
+  price        Decimal?
+  status       OrderStatus @default(PENDING)
+  timeInForce  String     @default("DAY")
+  submittedAt  DateTime   @default(now())
+  executedAt   DateTime?
+  cancelledAt  DateTime?
+
+  // Relationships
+  session  SimulationSession @relation(fields: [sessionId], references: [id])
+  user     User              @relation(fields: [userId], references: [id])
+  security Security          @relation(fields: [securityId], references: [id])
+  executions OrderExecution[]
+
+  @@map("orders")
+}
+
+enum OrderType {
+  MARKET
+  LIMIT
+  STOP
+  STOP_LIMIT
+}
+
+enum OrderSide {
+  BUY
+  SELL
+}
+
+enum OrderStatus {
+  PENDING
+  PARTIALLY_FILLED
+  FILLED
+  CANCELLED
+  REJECTED
+}
+
+model OrderExecution {
+  id        String   @id @default(cuid())
+  orderId   String
+  quantity  Int
+  price     Decimal
+  timestamp DateTime @default(now())
+
+  // Relationships
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@map("order_executions")
+}
+
+model Position {
+  id         String  @id @default(cuid())
+  sessionId  String
+  userId     String
+  securityId String
+  quantity   Int
+  avgPrice   Decimal
+  unrealizedPnL Decimal @default(0)
+  realizedPnL   Decimal @default(0)
+
+  // Relationships
+  session  SimulationSession @relation(fields: [sessionId], references: [id])
+  user     User              @relation(fields: [userId], references: [id])
+  security Security          @relation(fields: [securityId], references: [id])
+
+  @@unique([sessionId, userId, securityId])
+  @@map("positions")
+}
+
+// Market Data
+model MarketData {
+  id         String   @id @default(cuid())
+  securityId String
+  timestamp  DateTime @default(now())
+  bid        Decimal?
+  ask        Decimal?
+  last       Decimal?
+  volume     Int      @default(0)
+  high       Decimal?
+  low        Decimal?
+  open       Decimal?
+
+  // Relationships
+  security Security @relation(fields: [securityId], references: [id])
+
+  @@map("market_data")
+}
+
+model MarketState {
+  id              String   @id @default(cuid())
+  sessionId       String
+  tick            Int
+  isMarketOpen    Boolean  @default(false)
+  liquidityActive Boolean  @default(true)
+  liquidityDelay  Int      @default(8) // seconds
+  timestamp       DateTime @default(now())
+
+  // Relationships
+  session SimulationSession @relation(fields: [sessionId], references: [id])
+
+  @@map("market_state")
+}
+
+// Privilege System (35+ trading features)
+model PrivilegeDefinition {
+  id          String @id @default(cuid())
+  code        Int    @unique // 1-35+ privilege codes from XML
+  name        String
+  description String
+  category    String
+
+  // Relationships
+  userPrivileges UserPrivilege[]
+
+  @@map("privilege_definitions")
+}
+
+model UserPrivilege {
+  id          String    @id @default(cuid())
+  sessionId   String
+  userId      String
+  privilegeId String
+  grantedAt   DateTime  @default(now())
+  revokedAt   DateTime?
+  isActive    Boolean   @default(true)
+
+  // Relationships
+  session   SimulationSession   @relation(fields: [sessionId], references: [id])
+  user      User                @relation(fields: [userId], references: [id])
+  privilege PrivilegeDefinition @relation(fields: [privilegeId], references: [id])
+
+  @@unique([sessionId, userId, privilegeId])
+  @@map("user_privileges")
+}
+
+// Auction System
+model Auction {
+  id            String   @id @default(cuid())
+  sessionId     String
+  privilegeType Int // Privilege code being auctioned
+  available     Int // Number of rights available
+  initialPrice  Decimal
+  increment     Decimal
+  intervalSeconds Int
+  status        AuctionStatus @default(PENDING)
+  startTime     DateTime?
+  endTime       DateTime?
+  createdAt     DateTime @default(now())
+
+  // Relationships
+  session SimulationSession @relation(fields: [sessionId], references: [id])
+  bids    AuctionBid[]
+  rounds  AuctionRound[]
+
+  @@map("auctions")
+}
+
+enum AuctionStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+model AuctionRound {
+  id        String   @id @default(cuid())
+  auctionId String
+  round     Int
+  price     Decimal
+  bidders   Int
+  duration  Int
+  startTime DateTime
+  endTime   DateTime?
+
+  // Relationships
+  auction Auction @relation(fields: [auctionId], references: [id])
+
+  @@map("auction_rounds")
+}
+
+model AuctionBid {
+  id        String   @id @default(cuid())
+  auctionId String
+  userId    String
+  amount    Decimal
+  isWinner  Boolean  @default(false)
+  timestamp DateTime @default(now())
+
+  // Relationships
+  auction Auction @relation(fields: [auctionId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@map("auction_bids")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  title     String
+  message   String
+  data      String?  // JSON data
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("notifications")
+}
