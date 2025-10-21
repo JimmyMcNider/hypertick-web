@@ -197,7 +197,7 @@ export default function LessonAuthor({ user, classId }: LessonAuthorProps) {
         throw new Error(error.error || 'Failed to save lesson');
       }
     } catch (error) {
-      alert('Error saving lesson: ' + error.message);
+      alert('Error saving lesson: ' + (error instanceof Error ? error.message : String(error)));
     }
   };
 
