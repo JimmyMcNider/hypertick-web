@@ -19,6 +19,17 @@ export default function InstructorPanel({ user, sessionState, socket }: Instruct
   const [marketStatus, setMarketStatus] = useState('CLOSED');
   const [lastCommandResult, setLastCommandResult] = useState<string>('');
 
+  const availableCommands = [
+    'OPEN_MARKET',
+    'CLOSE_MARKET',
+    'PAUSE_TRADING',
+    'RESUME_TRADING',
+    'SET_VOLATILITY',
+    'TRIGGER_NEWS',
+    'ADJUST_LIQUIDITY',
+    'RESET_POSITIONS'
+  ];
+
   useEffect(() => {
     if (socket) {
       socket.on('command_response', (data: { success: boolean; command: string }) => {
