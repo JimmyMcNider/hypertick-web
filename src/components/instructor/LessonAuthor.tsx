@@ -61,8 +61,8 @@ export default function LessonAuthor({ user, classId }: LessonAuthorProps) {
     description: '',
     version: '1.0',
     author: `${user?.firstName} ${user?.lastName}` || 'Unknown',
-    created: new Date(),
-    lastModified: new Date(),
+    created: new Date().toISOString(),
+    lastModified: new Date().toISOString(),
     estimatedDuration: 900,
     scenarios: [
       {
