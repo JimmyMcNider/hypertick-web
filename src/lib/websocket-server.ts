@@ -9,7 +9,7 @@
 import { Server as HTTPServer } from 'http';
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import { enhancedSessionEngine, ActiveSession, SessionParticipant } from './enhanced-session-engine';
-import { verifyToken } from './auth';
+import { authService } from './auth';
 import { prisma } from './db';
 import { tradingEngine } from './trading-engine';
 import { getRedisClient, setSession, getSession } from './redis';
@@ -92,7 +92,8 @@ export class WebSocketServer {
       // Authentication middleware
       socket.on('authenticate', async (data: { token: string }) => {
         try {
-          const userId = await verifyToken(data.token);
+          const authUser = await authService.verifyToken(data.token);
+          const userId = authUser.id;
           if (!userId) throw new Error('Invalid token');
 
           const user = await prisma.user.findUnique({
