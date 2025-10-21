@@ -152,7 +152,7 @@ export default function LessonAuthor({ user, classId }: LessonAuthorProps) {
       description: command.description
     };
 
-    const currentScenario = lesson.scenarios.find(s => s.id === selectedScenario);
+    const currentScenario = lesson.scenarios[selectedScenario];
     if (currentScenario) {
       const updatedCommands = [...currentScenario.commands, command].sort((a, b) => a.timestamp - b.timestamp);
       handleUpdateScenario(selectedScenario, { commands: updatedCommands });
@@ -165,7 +165,7 @@ export default function LessonAuthor({ user, classId }: LessonAuthorProps) {
   };
 
   const handleRemoveCommand = (commandId: string) => {
-    const currentScenario = lesson.scenarios.find(s => s.id === selectedScenario);
+    const currentScenario = lesson.scenarios[selectedScenario];
     if (currentScenario) {
       const updatedCommands = currentScenario.commands.filter(cmd => cmd.id !== commandId);
       handleUpdateScenario(selectedScenario, { commands: updatedCommands });
