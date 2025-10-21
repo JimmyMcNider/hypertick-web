@@ -26,7 +26,7 @@ services:
       - key: WEBSOCKET_PORT
         value: 3001
     healthCheckPath: /api/health
-    autoDeploy: false
+    autoDeploy: true
 
   - type: pserv
     name: hypertick-db
