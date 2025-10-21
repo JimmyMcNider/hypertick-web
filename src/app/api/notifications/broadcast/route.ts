@@ -34,8 +34,7 @@ export const POST = requireAuth(async (request: NextRequest & { user: any }) => 
     // Get all students in the class
     const enrollments = await prisma.classEnrollment.findMany({
       where: {
-        classId,
-        isActive: true
+        classId
       },
       include: {
         user: {
