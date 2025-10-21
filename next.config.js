@@ -8,10 +8,7 @@ const nextConfig = {
     // Only fail build on TypeScript errors, not warnings
     ignoreBuildErrors: false,
   },
-  experimental: {
-    // Enable server components
-    serverComponentsExternalPackages: ['@prisma/client'],
-  },
+  serverExternalPackages: ['@prisma/client'],
 }
 
 module.exports = nextConfig

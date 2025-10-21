@@ -8,12 +8,10 @@ export const GET = requireAuth(async (request: NextRequest & { user: any }, { pa
     const { classId } = params;
 
     // Verify user has access to this class
-    const classAccess = await prisma.classInstructor.findUnique({
+    const classAccess = await prisma.class.findUnique({
       where: {
-        classId_instructorId: {
-          classId,
-          instructorId: request.user.id
-        }
+        id: classId,
+        instructorId: request.user.id
       }
     });
 

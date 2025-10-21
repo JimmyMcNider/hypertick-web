@@ -77,12 +77,10 @@ export const POST = requireAuth(async (request: NextRequest & { user: any }) => 
     if (saveLesson && lessonData.title) {
       // Verify user has access to this class
       if (classId) {
-        const classAccess = await prisma.classInstructor.findUnique({
+        const classAccess = await prisma.class.findUnique({
           where: {
-            classId_instructorId: {
-              classId,
-              instructorId: request.user.id
-            }
+            id: classId,
+            instructorId: request.user.id
           }
         });
 
