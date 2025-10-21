@@ -692,6 +692,7 @@ export class WebSocketServer {
       id: `cmd-${Date.now()}`,
       type: command as any,
       timestamp: 0,
+      description: `Instructor command: ${command}`,
       parameters 
     });
   }
