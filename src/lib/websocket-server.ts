@@ -688,7 +688,12 @@ export class WebSocketServer {
     const { command, parameters } = commandData;
     
     // Execute command through enhanced session engine
-    await enhancedSessionEngine.executeCommand(sessionId, { name: command, parameters });
+    await enhancedSessionEngine.executeCommand(sessionId, { 
+      id: `cmd-${Date.now()}`,
+      type: command as any,
+      timestamp: 0,
+      parameters 
+    });
   }
 
   /**
