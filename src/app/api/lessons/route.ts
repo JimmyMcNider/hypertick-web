@@ -94,28 +94,12 @@ export const POST = requireAuth(async (request: NextRequest & { user: any }) => 
         data: {
           name: lessonData.title,
           description: lessonData.description || '',
-          xmlContent: generateLessonXML(lessonData),
-          difficulty: lessonData.metadata?.difficulty || 'BEGINNER',
-          category: lessonData.metadata?.category || 'GENERAL',
-          estimatedDuration: lessonData.estimatedDuration || 900,
-          authorId: request.user.id,
-          tags: lessonData.metadata?.tags?.join(',') || '',
-          learningObjectives: lessonData.metadata?.learningObjectives?.join('|') || '',
-          prerequisites: lessonData.metadata?.prerequisites?.join('|') || '',
-          version: lessonData.version || '1.0',
-          isActive: true
+          xmlConfig: generateLessonXML(lessonData)
         }
       });
 
-      // Associate with class if provided
-      if (classId) {
-        await prisma.classLesson.create({
-          data: {
-            classId,
-            lessonId: lesson.id
-          }
-        });
-      }
+      // Note: Class-lesson association would need to be implemented
+      // if a many-to-many relationship is needed in the future
 
       return NextResponse.json({ 
         message: 'Lesson saved successfully',
