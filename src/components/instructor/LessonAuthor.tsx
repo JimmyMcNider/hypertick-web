@@ -287,28 +287,38 @@ export default function LessonAuthor({ user, classId }: LessonAuthorProps) {
       description,
       version: '1.0',
       author: user?.firstName + ' ' + user?.lastName || 'Unknown',
-      created: new Date(),
-      lastModified: new Date(),
+      created: new Date().toISOString(),
+      difficulty: 'BEGINNER' as const,
       estimatedDuration: 900,
-      scenarios: [{
-        id: 'A',
-        name: 'Scenario A',
-        description: 'Imported scenario',
-        securities: ['AOE', 'BOND1'],
-        initialPrices: { AOE: 50.00, BOND1: 100.00 },
-        commands: []
-      }],
+      learningObjectives: [],
+      prerequisites: [],
+      defaultScenario: 'A',
+      scenarios: {
+        'A': {
+          id: 'A',
+          name: 'Scenario A',
+          description: 'Imported scenario',
+          duration: 900,
+          initialState: {
+            marketOpen: true,
+            initialPrices: { AOE: 50.00, BOND1: 100.00 },
+            enabledSymbols: ['AOE', 'BOND1'],
+            liquidityTraders: [],
+            defaultPrivileges: []
+          },
+          commands: [],
+          objectives: []
+        }
+      },
       metadata: {
-        difficulty: 'BEGINNER',
-        category: 'EQUITY_TRADING',
         tags: [],
-        learningObjectives: [],
-        prerequisites: []
+        category: 'EQUITY_TRADING',
+        subject: 'Market Making'
       }
     };
   };
 
-  const currentScenario = lesson.scenarios.find(s => s.id === selectedScenario);
+  const currentScenario = lesson.scenarios[selectedScenario];
 
   return (
     <div className="p-6 space-y-6">
