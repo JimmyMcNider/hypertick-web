@@ -474,7 +474,7 @@ export default function LessonAuthor({ user, classId }: LessonAuthorProps) {
         <div className="space-y-2 max-h-96 overflow-y-auto">
           {timeline.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
-              No commands added yet. Click "Add Command" to start building your lesson.
+              No commands added yet. Click &quot;Add Command&quot; to start building your lesson.
             </div>
           ) : (
             timeline.map((event, index) => (

@@ -346,7 +346,7 @@ export class AuthorizationService {
 }
 
 // Middleware for route protection (Next.js App Router compatible)
-export function requireAuth(handler: Function) {
+export function requireAuth(handler: (request: any, context?: any) => Promise<any>) {
   return async (request: any, context?: any) => {
     try {
       const token = request.headers.get('authorization')?.replace('Bearer ', '') ||
@@ -374,7 +374,7 @@ export function requireAuth(handler: Function) {
 }
 
 export function requireRole(role: 'STUDENT' | 'INSTRUCTOR' | 'ADMIN') {
-  return function(handler: Function) {
+  return function(handler: (request: any, context?: any) => Promise<any>) {
     return requireAuth(async (request: any, context?: any) => {
       const authzService = new AuthorizationService();
       
@@ -391,7 +391,7 @@ export function requireRole(role: 'STUDENT' | 'INSTRUCTOR' | 'ADMIN') {
 }
 
 export function requirePrivilege(privilegeCode: number) {
-  return function(handler: Function) {
+  return function(handler: (request: any, context?: any) => Promise<any>) {
     return requireAuth(async (request: any, context?: any) => {
       const url = new URL(request.url);
       const sessionId = url.searchParams.get('sessionId');
