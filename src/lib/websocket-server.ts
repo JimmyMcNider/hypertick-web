@@ -307,7 +307,7 @@ export class WebSocketServer {
           await this.processBid(socket.sessionId, socket.userId, bidData);
           
         } catch (error) {
-          socket.emit('bid_error', { error: error.message });
+          socket.emit('bid_error', { error: error instanceof Error ? error.message : String(error) });
         }
       });
 
