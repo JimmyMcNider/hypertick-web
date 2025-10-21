@@ -33,6 +33,7 @@ services:
     plan: starter
     databaseName: hypertick
     user: hypertick
+    region: oregon
 
   - type: redis
     name: hypertick-redis
