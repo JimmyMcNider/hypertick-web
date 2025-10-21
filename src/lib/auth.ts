@@ -170,7 +170,9 @@ export class AuthService {
     
     // Add session-specific privileges if available
     if (sessionId && user.privileges) {
-      sanitizedUser.privileges = user.privileges.map(up => up.privilege.code);
+      sanitizedUser.privileges = user.privileges
+        .filter(up => up.privilege) // Only include if privilege was loaded
+        .map(up => up.privilege.code);
     }
 
     return sanitizedUser;
