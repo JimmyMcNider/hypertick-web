@@ -69,9 +69,16 @@ export default function LessonAuthor({ user, classId }: LessonAuthorProps) {
         id: 'A',
         name: 'Scenario A',
         description: 'Primary simulation scenario',
-        securities: ['AOE', 'BOND1'],
-        initialPrices: { AOE: 50.00, BOND1: 100.00 },
-        commands: []
+        duration: 900,
+        initialState: {
+          marketOpen: true,
+          initialPrices: { AOE: 50.00, BOND1: 100.00 },
+          enabledSymbols: ['AOE', 'BOND1'],
+          liquidityTraders: [],
+          defaultPrivileges: []
+        },
+        commands: [],
+        objectives: []
       }
     ],
     metadata: {
