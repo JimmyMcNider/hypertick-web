@@ -366,14 +366,12 @@ export class TradingEngine extends EventEmitter {
       where: { id: order.id },
       data: {
         status: order.status,
-        filledQuantity: order.filledQuantity,
-        filledPrice: order.filledPrice,
-        filledAt: order.filledAt
+        executedAt: order.status === 'FILLED' ? order.filledAt : undefined
       }
     });
 
     // Update position
-    await this.updatePosition(order.sessionUserId, order.symbol, order.side, actualFillQuantity, fillPrice);
+    await this.updatePosition(order.userId, order.symbol, order.side, actualFillQuantity, fillPrice);
 
     // Create trade record
     const trade: Trade = {
