@@ -163,9 +163,15 @@ export class WebSocketServer {
 
           // Add participant to enhanced session engine
           if (socket.userId && socket.userRole) {
+            // Fetch user data for username
+            const userData = await prisma.user.findUnique({
+              where: { id: socket.userId },
+              select: { username: true }
+            });
+            
             const participant: SessionParticipant = {
               id: socket.userId,
-              username: user?.username || 'Unknown',
+              username: userData?.username || 'Unknown',
               role: socket.userRole,
               privileges: new Set([1, 8, 9, 13, 15]), // Default privileges
               socketId: socket.id,
