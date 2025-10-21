@@ -23,8 +23,7 @@ export const GET = requireAuth(async (request: NextRequest & { user: any }, { pa
     // Get enrolled students
     const enrollments = await prisma.classEnrollment.findMany({
       where: {
-        classId,
-        isActive: true
+        classId
       },
       include: {
         user: {
