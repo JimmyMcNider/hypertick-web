@@ -24,7 +24,7 @@ export const GET = requireAuth(async (request: NextRequest & { user: any }, { pa
       where: {
         classId,
         status: {
-          in: ['PENDING', 'ACTIVE', 'PAUSED']
+          in: ['PENDING', 'IN_PROGRESS', 'PAUSED']
         }
       },
       include: {
