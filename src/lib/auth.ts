@@ -301,7 +301,7 @@ export class AuthorizationService {
     userId: string,
     rolePreset: keyof typeof ROLE_PRIVILEGE_PRESETS
   ): Promise<void> {
-    const privilegeCodes = ROLE_PRIVILEGE_PRESETS[rolePreset];
+    const privilegeCodes = [...ROLE_PRIVILEGE_PRESETS[rolePreset]];
     await this.grantPrivileges(sessionId, userId, privilegeCodes);
   }
 
