@@ -147,7 +147,7 @@ export class XMLLessonParser {
       };
       
     } catch (error) {
-      throw new Error(`Failed to parse lesson XML: ${error.message}`);
+      throw new Error(`Failed to parse lesson XML: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
