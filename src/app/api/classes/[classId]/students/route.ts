@@ -34,7 +34,6 @@ export const GET = requireAuth(async (request: NextRequest & { user: any }, { pa
             firstName: true,
             lastName: true,
             email: true,
-            lastLogin: true,
             createdAt: true
           }
         }
