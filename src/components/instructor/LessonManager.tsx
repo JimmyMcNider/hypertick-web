@@ -126,7 +126,7 @@ export default function LessonManager({ user, classId, socket }: LessonManagerPr
 
       // Update local state
       setActiveSession(createData.session);
-      addLog(`Session started: ${selectedLesson.name} - Scenario ${selectedScenario}`);
+      addLog(`Session started: ${selectedLesson.title} - Scenario ${selectedScenario}`);
 
       // Notify via socket
       if (socket) {

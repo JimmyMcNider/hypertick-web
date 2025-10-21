@@ -493,7 +493,7 @@ export default function LiveSessionControl({ user, classId }: LiveSessionControl
                   <option value="">Select a lesson</option>
                   {availableLessons.map(lesson => (
                     <option key={lesson.id} value={lesson.id}>
-                      {lesson.name || lesson.title}
+                      {lesson.title}
                     </option>
                   ))}
                 </select>
