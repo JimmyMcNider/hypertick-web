@@ -352,6 +352,11 @@ export class TradingEngine extends EventEmitter {
    * Fill an order (full or partial)
    */
   private async fillOrder(sessionId: string, order: Order, fillQuantity: number, fillPrice: number): Promise<void> {
+    // Get the userId from sessionUser
+    const sessionUser = await prisma.sessionUser.findUnique({
+      where: { id: order.sessionUserId }
+    });
+    if (!sessionUser) throw new Error('Session user not found');
     const remainingQuantity = order.quantity - order.filledQuantity;
     const actualFillQuantity = Math.min(fillQuantity, remainingQuantity);
 
@@ -371,7 +376,7 @@ export class TradingEngine extends EventEmitter {
     });
 
     // Update position
-    await this.updatePosition(order.userId, order.symbol, order.side, actualFillQuantity, fillPrice);
+    await this.updatePosition(sessionUser.userId, order.symbol, order.side, actualFillQuantity, fillPrice);
 
     // Create trade record
     const trade: Trade = {
