@@ -436,13 +436,15 @@ export default function LessonAuthor({ user, classId }: LessonAuthorProps) {
               <label key={security.symbol} className="flex items-center space-x-2">
                 <input
                   type="checkbox"
-                  checked={currentScenario?.securities.includes(security.symbol) || false}
+                  checked={currentScenario?.initialState.enabledSymbols.includes(security.symbol) || false}
                   onChange={(e) => {
                     if (!currentScenario) return;
-                    const securities = e.target.checked
-                      ? [...currentScenario.securities, security.symbol]
-                      : currentScenario.securities.filter(s => s !== security.symbol);
-                    handleUpdateScenario(selectedScenario, { securities });
+                    const enabledSymbols = e.target.checked
+                      ? [...currentScenario.initialState.enabledSymbols, security.symbol]
+                      : currentScenario.initialState.enabledSymbols.filter(s => s !== security.symbol);
+                    handleUpdateScenario(selectedScenario, { 
+                      initialState: { ...currentScenario.initialState, enabledSymbols }
+                    });
                   }}
                   className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
