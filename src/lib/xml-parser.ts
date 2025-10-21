@@ -128,7 +128,7 @@ export class XMLLessonParser {
    */
   async parseLesson(xmlContent: string): Promise<LessonConfig> {
     try {
-      const result = await parseXML(xmlContent);
+      const result = await parseXML(xmlContent) as any;
       const lessonNode = result.lesson;
       
       if (!lessonNode) {
