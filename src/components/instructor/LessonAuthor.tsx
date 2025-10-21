@@ -126,9 +126,10 @@ export default function LessonAuthor({ user, classId }: LessonAuthorProps) {
   const handleUpdateScenario = (scenarioId: string, updates: Partial<LessonScenario>) => {
     setLesson(prev => ({
       ...prev,
-      scenarios: prev.scenarios.map(scenario =>
-        scenario.id === scenarioId ? { ...scenario, ...updates } : scenario
-      )
+      scenarios: {
+        ...prev.scenarios,
+        [scenarioId]: { ...prev.scenarios[scenarioId], ...updates }
+      }
     }));
   };
 
