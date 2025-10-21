@@ -82,11 +82,9 @@ export default function LessonAuthor({ user, classId }: LessonAuthorProps) {
       }
     },
     metadata: {
-      difficulty: 'BEGINNER',
-      category: 'EQUITY_TRADING',
       tags: ['basic', 'equity', 'market-making'],
-      learningObjectives: [],
-      prerequisites: []
+      category: 'EQUITY_TRADING',
+      subject: 'Market Making'
     }
   });
 
