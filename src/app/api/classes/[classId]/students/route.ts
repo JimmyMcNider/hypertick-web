@@ -50,10 +50,10 @@ export const GET = requireAuth(async (request: NextRequest & { user: any }, { pa
       firstName: enrollment.user.firstName,
       lastName: enrollment.user.lastName,
       email: enrollment.user.email,
-      enrollmentDate: enrollment.enrolledAt,
-      isActive: enrollment.isActive,
-      lastLogin: enrollment.user.lastLogin,
-      canvasId: enrollment.canvasId
+      enrollmentDate: enrollment.user.createdAt, // Use user creation date as fallback
+      isActive: true, // Default value
+      lastLogin: null, // Field doesn't exist in User model
+      canvasId: null // Field doesn't exist in ClassEnrollment model
     }));
 
     return NextResponse.json({ students });
