@@ -78,11 +78,15 @@ export const GET = requireAuth(async (request: NextRequest & { user: any }, { pa
         username: sessionUser.user.username,
         firstName: sessionUser.user.firstName,
         lastName: sessionUser.user.lastName,
-        isConnected: sessionUser.isConnected,
-        terminalStatus: sessionUser.terminalStatus || 'OFFLINE',
-        lastActivity: sessionUser.lastActivity || sessionUser.user.lastLogin,
-        performance: sessionUser.performanceData ? JSON.parse(sessionUser.performanceData) : {
-          totalPnL: 0,
+        role: sessionUser.role,
+        startingEquity: sessionUser.startingEquity,
+        currentEquity: sessionUser.currentEquity,
+        isActive: sessionUser.isActive,
+        isConnected: false, // Default value - would be managed by WebSocket
+        terminalStatus: 'OFFLINE', // Default value
+        lastActivity: new Date().toISOString(), // Default to current time
+        performance: {
+          totalPnL: Number(sessionUser.currentEquity) - Number(sessionUser.startingEquity),
           tradesExecuted: 0,
           riskScore: 0
         }
