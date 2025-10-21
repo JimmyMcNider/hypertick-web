@@ -241,7 +241,7 @@ export class XMLLessonParser {
     for (const cmdNode of commandNodes) {
       const command: Command = {
         name: cmdNode.$.name,
-        parameters: (cmdNode.parameter || []).map(p => {
+        parameters: (cmdNode.parameter || []).map((p: any) => {
           // Try to parse as number or boolean, fallback to string
           if (p === 'true') return true;
           if (p === 'false') return false;
