@@ -68,7 +68,7 @@ export interface ActiveSession {
 export interface SessionEvent {
   id: string;
   timestamp: Date;
-  type: 'COMMAND_EXECUTED' | 'PARTICIPANT_JOINED' | 'PARTICIPANT_LEFT' | 
+  type: 'SESSION_INITIALIZED' | 'COMMAND_EXECUTED' | 'PARTICIPANT_JOINED' | 'PARTICIPANT_LEFT' | 
         'TRADE_EXECUTED' | 'MARKET_OPENED' | 'MARKET_CLOSED' | 'AUCTION_STARTED' |
         'AUCTION_ENDED' | 'NEWS_INJECTED' | 'PRICE_UPDATED' | 'SESSION_PAUSED' | 'SESSION_RESUMED';
   data: any;
