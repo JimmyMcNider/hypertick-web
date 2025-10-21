@@ -7,6 +7,14 @@
 
 import { useState, useEffect } from 'react';
 
+interface Participant {
+  id: string;
+  username: string;
+  equity: number;
+  pnl: number;
+  status: string;
+}
+
 interface InstructorProps {
   user: any;
   sessionState: any;
@@ -15,7 +23,7 @@ interface InstructorProps {
 
 export default function InstructorPanel({ user, sessionState, socket }: InstructorProps) {
   const [selectedCommand, setSelectedCommand] = useState('');
-  const [participants, setParticipants] = useState([]);
+  const [participants, setParticipants] = useState<Participant[]>([]);
   const [marketStatus, setMarketStatus] = useState('CLOSED');
   const [lastCommandResult, setLastCommandResult] = useState<string>('');
 
