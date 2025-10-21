@@ -33,7 +33,7 @@ export const GET = requireAuth(async (request: NextRequest & { user: any }, { pa
             id: true,
             name: true,
             description: true,
-            xmlContent: true
+            xmlConfig: true
           }
         },
         sessionUsers: {
