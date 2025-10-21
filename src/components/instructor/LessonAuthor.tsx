@@ -64,8 +64,8 @@ export default function LessonAuthor({ user, classId }: LessonAuthorProps) {
     created: new Date().toISOString(),
     lastModified: new Date().toISOString(),
     estimatedDuration: 900,
-    scenarios: [
-      {
+    scenarios: {
+      'A': {
         id: 'A',
         name: 'Scenario A',
         description: 'Primary simulation scenario',
@@ -80,7 +80,7 @@ export default function LessonAuthor({ user, classId }: LessonAuthorProps) {
         commands: [],
         objectives: []
       }
-    ],
+    },
     metadata: {
       difficulty: 'BEGINNER',
       category: 'EQUITY_TRADING',
