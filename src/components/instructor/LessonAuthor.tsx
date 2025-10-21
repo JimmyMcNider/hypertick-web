@@ -62,8 +62,11 @@ export default function LessonAuthor({ user, classId }: LessonAuthorProps) {
     version: '1.0',
     author: `${user?.firstName} ${user?.lastName}` || 'Unknown',
     created: new Date().toISOString(),
-    lastModified: new Date().toISOString(),
+    difficulty: 'BEGINNER' as const,
     estimatedDuration: 900,
+    learningObjectives: [],
+    prerequisites: [],
+    defaultScenario: 'A',
     scenarios: {
       'A': {
         id: 'A',
