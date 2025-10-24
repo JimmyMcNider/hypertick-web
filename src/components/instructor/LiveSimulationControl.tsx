@@ -21,6 +21,7 @@ import {
   VolumeX,
   Volume2
 } from 'lucide-react';
+import { useWebSocket, useWebSocketEvent } from '@/hooks/useWebSocket';
 
 interface SimulationSession {
   id: string;
@@ -68,6 +69,75 @@ export default function LiveSimulationControl({
   const [announcements, setAnnouncements] = useState<string[]>([]);
   const [currentAnnouncement, setCurrentAnnouncement] = useState('');
 
+  // WebSocket integration for real-time updates
+  const { emit, isConnected, joinSession, leaveSession } = useWebSocket();
+
+  // Set up WebSocket event listeners using the useWebSocketEvent hook
+  useWebSocketEvent('session_started', (data: any) => {
+    console.log('Session started:', data);
+    loadSessionData();
+  });
+
+  useWebSocketEvent('session_paused', (data: any) => {
+    console.log('Session paused:', data);
+    loadSessionData();
+  });
+
+  useWebSocketEvent('session_resumed', (data: any) => {
+    console.log('Session resumed:', data);
+    loadSessionData();
+  });
+
+  useWebSocketEvent('session_ended', (data: any) => {
+    console.log('Session ended:', data);
+    loadSessionData();
+  });
+
+  useWebSocketEvent('command_executed', (data: any) => {
+    console.log('Command executed:', data);
+    loadSessionData();
+  });
+
+  useWebSocketEvent('privilege_granted', (data: any) => {
+    console.log('Privilege granted:', data);
+    loadSessionData();
+  });
+
+  useWebSocketEvent('market_opened', (data: any) => {
+    console.log('Market opened:', data);
+    loadSessionData();
+  });
+
+  useWebSocketEvent('market_closed', (data: any) => {
+    console.log('Market closed:', data);
+    loadSessionData();
+  });
+
+  useWebSocketEvent('participant_joined', (data: any) => {
+    console.log('Participant joined:', data);
+    loadSessionData();
+  });
+
+  useWebSocketEvent('participant_left', (data: any) => {
+    console.log('Participant left:', data);
+    loadSessionData();
+  });
+
+  // Join session when component mounts and leave when it unmounts
+  useEffect(() => {
+    if (isConnected && sessionId) {
+      joinSession(sessionId).catch(error => {
+        console.error('Failed to join session:', error);
+      });
+    }
+
+    return () => {
+      if (isConnected) {
+        leaveSession();
+      }
+    };
+  }, [isConnected, sessionId, joinSession, leaveSession]);
+
   // Load session data
   useEffect(() => {
     loadSessionData();
@@ -94,7 +164,7 @@ export default function LiveSimulationControl({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'START_SIMULATION',
+          action: 'START_SESSION',
           sessionId,
           scenario: selectedScenario,
           classId
@@ -102,7 +172,7 @@ export default function LiveSimulationControl({
       });
 
       if (response.ok) {
-        onCommandExecute('START_SIMULATION', [selectedScenario]);
+        onCommandExecute('START_SESSION', [selectedScenario]);
         await loadSessionData();
       }
     } catch (error) {
@@ -119,13 +189,13 @@ export default function LiveSimulationControl({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'PAUSE_SIMULATION',
+          action: 'PAUSE_SESSION',
           sessionId
         })
       });
 
       if (response.ok) {
-        onCommandExecute('PAUSE_SIMULATION', []);
+        onCommandExecute('PAUSE_SESSION', []);
         await loadSessionData();
       }
     } catch (error) {
@@ -142,13 +212,13 @@ export default function LiveSimulationControl({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'RESUME_SIMULATION',
+          action: 'RESUME_SESSION',
           sessionId
         })
       });
 
       if (response.ok) {
-        onCommandExecute('RESUME_SIMULATION', []);
+        onCommandExecute('RESUME_SESSION', []);
         await loadSessionData();
       }
     } catch (error) {
@@ -165,13 +235,13 @@ export default function LiveSimulationControl({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'STOP_SIMULATION',
+          action: 'END_SESSION',
           sessionId
         })
       });
 
       if (response.ok) {
-        onCommandExecute('STOP_SIMULATION', []);
+        onCommandExecute('END_SESSION', []);
         await loadSessionData();
       }
     } catch (error) {
@@ -185,22 +255,52 @@ export default function LiveSimulationControl({
     const commandType = command === 'GRANT' ? 'GRANT_PRIVILEGE' : 'REMOVE_PRIVILEGE';
     
     try {
-      onCommandExecute(commandType, [privilegeId, targetRole]);
-      
-      // Update UI immediately
-      if (session) {
-        setSession(prev => ({
-          ...prev!,
-          participants: prev!.participants.map(p => ({
-            ...p,
-            privileges: command === 'GRANT' 
-              ? [...p.privileges, privilegeId]
-              : p.privileges.filter(id => id !== privilegeId)
-          }))
-        }));
+      const response = await fetch('/api/sessions/manage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'EXECUTE_COMMAND',
+          sessionId,
+          parameters: {
+            type: commandType,
+            parameters: {
+              privilegeCode: privilegeId,
+              targetRole: targetRole
+            }
+          }
+        })
+      });
+
+      if (response.ok) {
+        onCommandExecute(commandType, [privilegeId, targetRole]);
+        await loadSessionData();
       }
     } catch (error) {
       console.error(`Failed to ${command.toLowerCase()} privilege:`, error);
+    }
+  };
+
+  const executeAdvancedCommand = async (commandType: string, parameters: any) => {
+    try {
+      const response = await fetch('/api/sessions/manage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'EXECUTE_COMMAND',
+          sessionId,
+          parameters: {
+            type: commandType,
+            parameters
+          }
+        })
+      });
+
+      if (response.ok) {
+        onCommandExecute(commandType, [parameters]);
+        await loadSessionData();
+      }
+    } catch (error) {
+      console.error(`Failed to execute ${commandType}:`, error);
     }
   };
 
@@ -252,14 +352,22 @@ export default function LiveSimulationControl({
       {/* Main Control Panel */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Zap className="h-5 w-5" />
-            Live Simulation Control
-            {session && (
-              <Badge className={`ml-2 ${getStatusColor(session.status)} text-white`}>
-                {session.status}
-              </Badge>
-            )}
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Zap className="h-5 w-5" />
+              Live Simulation Control
+              {session && (
+                <Badge className={`ml-2 ${getStatusColor(session.status)} text-white`}>
+                  {session.status}
+                </Badge>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+              <span className="text-xs text-gray-500">
+                {isConnected ? 'Connected' : 'Disconnected'}
+              </span>
+            </div>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -465,7 +573,7 @@ export default function LiveSimulationControl({
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               <Button 
                 variant="outline" 
-                onClick={() => onCommandExecute('OPEN_MARKET', [])}
+                onClick={() => executeAdvancedCommand('OPEN_MARKET', { symbols: ['AOE', 'BOND1', 'BOND2'] })}
                 className="text-sm"
               >
                 <BarChart3 className="h-4 w-4 mr-2" />
@@ -473,7 +581,7 @@ export default function LiveSimulationControl({
               </Button>
               <Button 
                 variant="outline" 
-                onClick={() => onCommandExecute('CLOSE_MARKET', [])}
+                onClick={() => executeAdvancedCommand('CLOSE_MARKET', { symbols: [] })}
                 className="text-sm"
               >
                 <VolumeX className="h-4 w-4 mr-2" />
@@ -481,7 +589,7 @@ export default function LiveSimulationControl({
               </Button>
               <Button 
                 variant="outline" 
-                onClick={() => onCommandExecute('CREATE_AUCTION', [22])}
+                onClick={() => executeAdvancedCommand('CREATE_AUCTION', { symbol: 'AOE', duration: 60, minimumBid: 100, description: 'Market Making Auction' })}
                 className="text-sm"
               >
                 <Zap className="h-4 w-4 mr-2" />
@@ -489,7 +597,7 @@ export default function LiveSimulationControl({
               </Button>
               <Button 
                 variant="outline" 
-                onClick={() => onCommandExecute('SET_LIQUIDITY_TRADER', [1, 'Active', true])}
+                onClick={() => executeAdvancedCommand('SET_LIQUIDITY_TRADER', { username: 'liquidity_bot', enabled: true })}
                 className="text-sm"
               >
                 <RefreshCw className="h-4 w-4 mr-2" />
@@ -505,7 +613,7 @@ export default function LiveSimulationControl({
               </Button>
               <Button 
                 variant="outline" 
-                onClick={() => onCommandExecute('RESET_POSITIONS', [])}
+                onClick={() => executeAdvancedCommand('RESET_POSITIONS', { targetUsers: [] })}
                 className="text-sm"
               >
                 <AlertTriangle className="h-4 w-4 mr-2" />
