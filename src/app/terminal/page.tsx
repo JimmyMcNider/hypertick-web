@@ -390,12 +390,12 @@ export default function TradingTerminal() {
         </div>
       </div>
 
-      {/* Enhanced Trading Terminal */}
+      {/* Professional Trading Workspace */}
       <div className="h-[calc(100vh-50px)]">
-        <SimpleTradingTerminal
+        <ProfessionalTradingWorkspace
           sessionId={sessionState?.id || 'demo-session'}
           userId={user?.id || ''}
-          token={token}
+          userRole={user?.role || 'STUDENT'}
         />
       </div>
     </div>
