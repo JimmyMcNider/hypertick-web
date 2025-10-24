@@ -552,42 +552,215 @@ const RiskManagementWindow = ({ windowId }: { windowId: string }) => (
   </div>
 );
 
-const AuctionWindow = ({ windowId }: { windowId: string }) => (
-  <div className="h-full bg-purple-900 text-purple-100 text-sm overflow-auto">
-    <div className="p-2 border-b border-purple-400 bg-purple-800 font-bold">
-      Market Making Auction
+const AuctionWindow = ({ windowId }: { windowId: string }) => {
+  const [activeAuctions, setActiveAuctions] = useState<any[]>([]);
+  const [selectedAuction, setSelectedAuction] = useState<any>(null);
+  const [bidAmount, setBidAmount] = useState<string>('');
+  const [bidHistory, setBidHistory] = useState<any[]>([]);
+  const [timeRemaining, setTimeRemaining] = useState<number>(0);
+
+  // Simulate auction data - in real implementation, this would come from WebSocket
+  useEffect(() => {
+    // Initialize with a sample auction
+    const sampleAuction = {
+      id: 'auction_001',
+      symbol: 'AOE',
+      description: 'Market Making Rights for AOE',
+      currentBid: 2500,
+      minimumBid: 1000,
+      highestBidder: 'Trader_3',
+      endTime: new Date(Date.now() + 60000), // 1 minute from now
+      status: 'ACTIVE'
+    };
+
+    setActiveAuctions([sampleAuction]);
+    setSelectedAuction(sampleAuction);
+
+    // Initialize bid history
+    setBidHistory([
+      { bidder: 'Trader_3', amount: 2500, timestamp: new Date(Date.now() - 15000) },
+      { bidder: 'Trader_1', amount: 2250, timestamp: new Date(Date.now() - 45000) },
+      { bidder: 'Trader_5', amount: 2000, timestamp: new Date(Date.now() - 120000) },
+      { bidder: 'Trader_2', amount: 1500, timestamp: new Date(Date.now() - 180000) }
+    ]);
+
+    // Update timer
+    const timer = setInterval(() => {
+      if (selectedAuction) {
+        const remaining = Math.max(0, selectedAuction.endTime.getTime() - Date.now());
+        setTimeRemaining(Math.ceil(remaining / 1000));
+        
+        if (remaining <= 0) {
+          setSelectedAuction((prev: any) => prev ? { ...prev, status: 'ENDED' } : null);
+        }
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [selectedAuction?.id]);
+
+  const handlePlaceBid = () => {
+    const bid = parseFloat(bidAmount);
+    if (!selectedAuction || !bid || bid <= selectedAuction.currentBid) {
+      alert('Bid must be higher than current bid');
+      return;
+    }
+
+    // Add new bid to history
+    const newBid = {
+      bidder: 'You',
+      amount: bid,
+      timestamp: new Date()
+    };
+
+    setBidHistory((prev: any[]) => [newBid, ...prev]);
+    
+    // Update auction
+    setSelectedAuction((prev: any) => ({
+      ...prev,
+      currentBid: bid,
+      highestBidder: 'You'
+    }));
+
+    setBidAmount('');
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const formatBidAmount = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0
+    }).format(amount);
+  };
+
+  if (!selectedAuction) {
+    return (
+      <div className="h-full bg-purple-900 text-purple-100 text-sm overflow-auto">
+        <div className="p-2 border-b border-purple-400 bg-purple-800 font-bold">
+          Market Making Auction
+        </div>
+        <div className="p-4 text-center">
+          <div className="text-purple-300 mb-4">No active auctions</div>
+          <div className="text-xs text-purple-400">
+            Auctions will appear here when market making rights become available
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full bg-purple-900 text-purple-100 text-sm overflow-auto">
+      <div className="p-2 border-b border-purple-400 bg-purple-800 font-bold flex items-center justify-between">
+        <span>Market Making Auction</span>
+        <div className={`px-2 py-1 rounded text-xs ${
+          selectedAuction.status === 'ACTIVE' ? 'bg-green-600' :
+          selectedAuction.status === 'ENDED' ? 'bg-red-600' : 'bg-gray-600'
+        }`}>
+          {selectedAuction.status}
+        </div>
+      </div>
+      
+      <div className="p-2 space-y-3">
+        <div className="text-center text-yellow-300 font-bold">
+          AUCTION: {selectedAuction.description}
+        </div>
+        
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <div className="text-xs text-purple-200">Current High Bid:</div>
+            <div className="text-lg font-bold text-yellow-300">
+              {formatBidAmount(selectedAuction.currentBid)}
+            </div>
+            <div className="text-xs text-purple-300">
+              by {selectedAuction.highestBidder}
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-purple-200">Time Remaining:</div>
+            <div className={`text-lg font-bold ${
+              timeRemaining <= 30 ? 'text-red-300 animate-pulse' : 'text-green-300'
+            }`}>
+              {timeRemaining > 0 ? formatTime(timeRemaining) : 'ENDED'}
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 text-xs">
+          <div>
+            <div className="text-purple-200">Minimum Bid:</div>
+            <div className="font-bold">{formatBidAmount(selectedAuction.minimumBid)}</div>
+          </div>
+          <div>
+            <div className="text-purple-200">Symbol:</div>
+            <div className="font-bold text-cyan-300">{selectedAuction.symbol}</div>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <div className="text-xs font-bold">Bid History:</div>
+          <div className="bg-purple-800 rounded p-2 max-h-32 overflow-y-auto">
+            {bidHistory.length > 0 ? (
+              <div className="text-xs space-y-1">
+                {bidHistory.map((bid, index) => (
+                  <div key={index} className="flex justify-between items-center">
+                    <span className={bid.bidder === 'You' ? 'text-yellow-300 font-bold' : ''}>
+                      {bid.bidder}:
+                    </span>
+                    <span className="font-bold">{formatBidAmount(bid.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-xs text-purple-400">No bids yet</div>
+            )}
+          </div>
+        </div>
+
+        {selectedAuction.status === 'ACTIVE' && timeRemaining > 0 && (
+          <div className="mt-4 space-y-2">
+            <div className="text-xs text-purple-200">
+              Minimum next bid: {formatBidAmount(selectedAuction.currentBid + 100)}
+            </div>
+            <input 
+              type="number" 
+              placeholder={`Min: ${selectedAuction.currentBid + 100}`}
+              value={bidAmount}
+              onChange={(e) => setBidAmount(e.target.value)}
+              className="w-full p-2 text-black rounded text-sm"
+              min={selectedAuction.currentBid + 100}
+            />
+            <Button 
+              onClick={handlePlaceBid}
+              className="w-full bg-yellow-600 hover:bg-yellow-700 text-black font-bold"
+              disabled={!bidAmount || parseFloat(bidAmount) <= selectedAuction.currentBid}
+            >
+              PLACE BID
+            </Button>
+          </div>
+        )}
+
+        {selectedAuction.status === 'ENDED' && (
+          <div className="mt-4 p-3 bg-red-800 rounded text-center">
+            <div className="text-yellow-300 font-bold">AUCTION ENDED</div>
+            <div className="text-sm mt-1">
+              Winner: <span className="font-bold">{selectedAuction.highestBidder}</span>
+            </div>
+            <div className="text-sm">
+              Winning Bid: <span className="font-bold">{formatBidAmount(selectedAuction.currentBid)}</span>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
-    <div className="p-2 space-y-3">
-      <div className="text-center text-yellow-300 font-bold">
-        AUCTION: Market Making Rights for PNR
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <div className="text-xs text-purple-200">Current High Bid:</div>
-          <div className="text-lg font-bold text-yellow-300">$2,500</div>
-        </div>
-        <div>
-          <div className="text-xs text-purple-200">Time Remaining:</div>
-          <div className="text-lg font-bold text-red-300">45s</div>
-        </div>
-      </div>
-      <div className="space-y-2">
-        <div className="text-xs font-bold">Bid History:</div>
-        <div className="text-xs space-y-1 bg-purple-800 p-2 rounded">
-          <div>Trader_3: $2,500</div>
-          <div>Trader_1: $2,250</div>
-          <div>Trader_5: $2,000</div>
-        </div>
-      </div>
-      <div className="mt-4">
-        <input type="number" placeholder="Enter bid amount" className="w-full p-2 text-black rounded mb-2" />
-        <Button className="w-full bg-yellow-600 hover:bg-yellow-700 text-black font-bold">
-          PLACE BID
-        </Button>
-      </div>
-    </div>
-  </div>
-);
+  );
+};
 
 const ThemeControlWindow = ({ windowId, onThemeChange }: { windowId: string; onThemeChange: (theme: string) => void }) => (
   <div className="h-full bg-gray-800 text-white text-sm overflow-auto">
