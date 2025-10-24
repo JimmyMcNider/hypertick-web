@@ -1,8 +1,39 @@
-# HyperTick Production Deployment Guide
+# 🚀 HyperTick Production Deployment Guide
 
-## Render + Supabase Deployment
+## 🎯 Quick Deploy Options
 
-This guide covers deploying HyperTick using Render for hosting and Supabase for the database (permanent free tier).
+### 1. Vercel (Recommended - Easiest)
+```bash
+# Install Vercel CLI
+npm i -g vercel
+
+# Deploy from project directory
+cd hypertick-web
+vercel --prod
+```
+
+### 2. Netlify
+```bash
+# Install Netlify CLI
+npm i -g netlify-cli
+
+# Deploy
+cd hypertick-web
+netlify deploy --prod --dir=.next
+```
+
+### 3. Docker (Self-Hosted)
+```bash
+# Build image
+docker build -t hypertick-web .
+
+# Run container
+docker run -p 3000:3000 hypertick-web
+```
+
+### 4. Render + Database (Comprehensive Setup)
+
+This guide covers deploying HyperTick using Render for hosting with full database integration.
 
 ### Prerequisites
 
