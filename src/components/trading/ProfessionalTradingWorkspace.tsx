@@ -131,50 +131,97 @@ const PortfolioWindow = ({ windowId, theme }: { windowId: string; theme?: any })
 
 const MarketWatchWindow = ({ windowId, theme }: { windowId: string; theme?: any }) => {
   const currentTheme = theme || TRADING_THEMES.classic;
+  const [marketData, setMarketData] = useState<Record<string, any>>({});
+  
+  // Subscribe to real-time market data via WebSocket
+  useEffect(() => {
+    // Initialize with default data for known symbols
+    const initialData = {
+      'AOE': { price: 50.00, bid: 49.95, ask: 50.05, volume: 125000, change: 0, changePercent: 0, open: 50.00 },
+      'BOND1': { price: 99.30, bid: 99.29, ask: 99.31, volume: 45000, change: 0, changePercent: 0, open: 99.30 },
+      'BOND2': { price: 102.80, bid: 102.79, ask: 102.81, volume: 32000, change: 0, changePercent: 0, open: 102.80 },
+      'BOND3': { price: 95.50, bid: 95.49, ask: 95.51, volume: 28000, change: 0, changePercent: 0, open: 95.50 },
+      'SPX': { price: 4150.00, bid: 4149.90, ask: 4150.10, volume: 890000, change: 0, changePercent: 0, open: 4150.00 }
+    };
+    setMarketData(initialData);
+
+    // Simulate live price updates
+    const interval = setInterval(() => {
+      setMarketData(prev => {
+        const updated = { ...prev };
+        Object.keys(updated).forEach(symbol => {
+          const data = updated[symbol];
+          const volatility = symbol.startsWith('BOND') ? 0.001 : 0.002;
+          const priceChange = (Math.random() - 0.5) * 2 * data.price * volatility;
+          const newPrice = Math.max(0.01, data.price + priceChange);
+          const spread = symbol.startsWith('BOND') ? 0.02 : 0.10;
+          
+          updated[symbol] = {
+            ...data,
+            price: newPrice,
+            bid: newPrice - spread / 2,
+            ask: newPrice + spread / 2,
+            volume: data.volume + Math.floor(Math.random() * 1000),
+            change: newPrice - data.open,
+            changePercent: ((newPrice - data.open) / data.open) * 100
+          };
+        });
+        return updated;
+      });
+    }, 1000); // Update every second
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const formatPrice = (price: number, symbol: string) => {
+    return symbol.startsWith('BOND') ? price.toFixed(2) : price.toFixed(2);
+  };
+
+  const formatVolume = (volume: number) => {
+    if (volume >= 1000000) return (volume / 1000000).toFixed(1) + 'M';
+    if (volume >= 1000) return (volume / 1000).toFixed(0) + 'K';
+    return volume.toString();
+  };
+
+  const formatChange = (change: number, changePercent: number) => {
+    const sign = change >= 0 ? '+' : '';
+    return `${sign}${change.toFixed(2)} (${sign}${changePercent.toFixed(2)}%)`;
+  };
+
+  const getChangeColor = (change: number) => {
+    if (change > 0) return currentTheme.positive;
+    if (change < 0) return currentTheme.negative;
+    return currentTheme.neutral;
+  };
+
   return (
     <div className={`h-full ${currentTheme.background} ${currentTheme.text} font-mono text-sm overflow-hidden`}>
       <div className={`grid grid-cols-6 gap-1 p-2 border-b ${currentTheme.border} ${currentTheme.header}`}>
-      <div className="font-bold">Symbol</div>
-      <div className="font-bold text-right">Last</div>
-      <div className="font-bold text-right">Bid</div>
-      <div className="font-bold text-right">Ask</div>
-      <div className="font-bold text-right">Volume</div>
-      <div className="font-bold text-right">Change</div>
-    </div>
-    <div className="p-2 space-y-1">
-      <div className="grid grid-cols-6 gap-1 hover:bg-gray-800 cursor-pointer">
-        <div className="text-cyan-400">USGOV_3mo</div>
-        <div className="text-right">5.00%</div>
-        <div className="text-right text-green-400">135.73</div>
-        <div className="text-right text-red-400">135.73</div>
-        <div className="text-right">170,413</div>
-        <div className="text-right text-green-400">+0.5%</div>
+        <div className="font-bold">Symbol</div>
+        <div className="font-bold text-right">Last</div>
+        <div className="font-bold text-right">Bid</div>
+        <div className="font-bold text-right">Ask</div>
+        <div className="font-bold text-right">Volume</div>
+        <div className="font-bold text-right">Change</div>
       </div>
-      <div className="grid grid-cols-6 gap-1 hover:bg-gray-800 cursor-pointer">
-        <div className="text-cyan-400">SP500</div>
-        <div className="text-right">152.47</div>
-        <div className="text-right text-green-400">155.30</div>
-        <div className="text-right text-red-400">69.69</div>
-        <div className="text-right">294,078</div>
-        <div className="text-right text-red-400">-15%</div>
+      <div className="p-2 space-y-1">
+        {Object.entries(marketData).map(([symbol, data]) => (
+          <div key={symbol} className="grid grid-cols-6 gap-1 hover:bg-gray-800 cursor-pointer p-1 rounded">
+            <div className={currentTheme.accent}>{symbol}</div>
+            <div className="text-right">{formatPrice(data.price, symbol)}</div>
+            <div className={`text-right ${currentTheme.positive}`}>{formatPrice(data.bid, symbol)}</div>
+            <div className={`text-right ${currentTheme.negative}`}>{formatPrice(data.ask, symbol)}</div>
+            <div className="text-right">{formatVolume(data.volume)}</div>
+            <div className={`text-right text-xs ${getChangeColor(data.change)}`}>
+              {formatChange(data.change, data.changePercent)}
+            </div>
+          </div>
+        ))}
       </div>
-      <div className="grid grid-cols-6 gap-1 hover:bg-gray-800 cursor-pointer">
-        <div className="text-cyan-400">PNR</div>
-        <div className="text-right">135.73</div>
-        <div className="text-right text-green-400">155.30</div>
-        <div className="text-right text-red-400">135.73</div>
-        <div className="text-right">170,413</div>
-        <div className="text-right text-green-400">+1.0%</div>
+      <div className={`absolute bottom-2 right-2 text-xs ${currentTheme.text} opacity-60`}>
+        <Activity className="inline w-3 h-3 mr-1" />
+        Live Market Data
       </div>
-      <div className="grid grid-cols-6 gap-1 hover:bg-gray-800 cursor-pointer">
-        <div className="text-cyan-400">VGR</div>
-        <div className="text-right">69.69</div>
-        <div className="text-right text-green-400">69.70</div>
-        <div className="text-right text-red-400">69.69</div>
-        <div className="text-right">294,078</div>
-        <div className="text-right text-red-400">-0.5%</div>
-      </div>
-    </div>
     </div>
   );
 };
@@ -320,46 +367,152 @@ const OrderLogWindow = ({ windowId }: { windowId: string }) => (
   </div>
 );
 
-const MarketGraphWindow = ({ windowId }: { windowId: string }) => (
-  <div className="h-full bg-black text-green-400 font-mono text-sm overflow-hidden">
-    <div className="p-2 border-b border-green-400 bg-gray-900">
-      <div className="flex justify-between items-center">
-        <div className="font-bold">PNR - Real Time Chart</div>
-        <div className="text-xs">Last: $135.73</div>
-      </div>
-    </div>
-    <div className="relative h-full p-2">
-      {/* Simulated price chart using ASCII-style representation */}
-      <div className="h-full flex flex-col justify-end">
-        <div className="h-full relative">
-          {/* Chart grid */}
-          <div className="absolute inset-0 grid grid-cols-10 grid-rows-10 border-r border-b border-green-800">
-            {Array.from({ length: 100 }).map((_, i) => (
-              <div key={i} className="border-l border-t border-green-800 opacity-30"></div>
-            ))}
+const MarketGraphWindow = ({ windowId }: { windowId: string }) => {
+  const [selectedSymbol, setSelectedSymbol] = useState('AOE');
+  const [priceHistory, setPriceHistory] = useState<number[]>([]);
+  const [currentPrice, setCurrentPrice] = useState(50.00);
+  const [priceChange, setPriceChange] = useState(0);
+
+  useEffect(() => {
+    // Initialize price history for the selected symbol
+    const initialPrice = selectedSymbol === 'AOE' ? 50.00 : 
+                         selectedSymbol === 'SPX' ? 4150.00 :
+                         selectedSymbol.startsWith('BOND') ? 99.30 : 50.00;
+    
+    const history = Array.from({ length: 50 }, (_, i) => {
+      const volatility = selectedSymbol.startsWith('BOND') ? 0.0005 : 0.001;
+      return initialPrice + (Math.random() - 0.5) * initialPrice * volatility * i * 0.1;
+    });
+    
+    setPriceHistory(history);
+    setCurrentPrice(history[history.length - 1]);
+
+    // Simulate real-time price updates
+    const interval = setInterval(() => {
+      setPriceHistory(prev => {
+        const lastPrice = prev[prev.length - 1];
+        const volatility = selectedSymbol.startsWith('BOND') ? 0.0005 : 0.001;
+        const change = (Math.random() - 0.5) * 2 * lastPrice * volatility;
+        const newPrice = Math.max(0.01, lastPrice + change);
+        
+        setCurrentPrice(newPrice);
+        setPriceChange(newPrice - prev[0]);
+        
+        // Keep last 50 points
+        const newHistory = [...prev.slice(1), newPrice];
+        return newHistory;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [selectedSymbol]);
+
+  // Generate SVG path for price line
+  const generatePath = () => {
+    if (priceHistory.length < 2) return '';
+    
+    const width = 400;
+    const height = 200;
+    const minPrice = Math.min(...priceHistory);
+    const maxPrice = Math.max(...priceHistory);
+    const priceRange = maxPrice - minPrice || 1;
+    
+    const points = priceHistory.map((price, index) => {
+      const x = (index / (priceHistory.length - 1)) * width;
+      const y = height - ((price - minPrice) / priceRange) * height;
+      return `${x},${y}`;
+    }).join(' ');
+    
+    return points;
+  };
+
+  const formatPrice = (price: number) => {
+    return selectedSymbol.startsWith('BOND') ? price.toFixed(2) : 
+           selectedSymbol === 'SPX' ? price.toFixed(2) : price.toFixed(2);
+  };
+
+  const symbols = ['AOE', 'SPX', 'BOND1', 'BOND2', 'BOND3'];
+
+  return (
+    <div className="h-full bg-black text-green-400 font-mono text-sm overflow-hidden">
+      <div className="p-2 border-b border-green-400 bg-gray-900">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center space-x-4">
+            <select 
+              value={selectedSymbol}
+              onChange={(e) => setSelectedSymbol(e.target.value)}
+              className="bg-gray-800 text-green-400 border border-green-400 rounded px-2 py-1 text-xs"
+            >
+              {symbols.map(symbol => (
+                <option key={symbol} value={symbol}>{symbol}</option>
+              ))}
+            </select>
+            <div className="font-bold">{selectedSymbol} - Real Time Chart</div>
           </div>
-          {/* Price line simulation */}
-          <svg className="absolute inset-0 w-full h-full">
-            <polyline
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              points="0,80 50,60 100,70 150,50 200,65 250,45 300,55 350,40 400,50"
-              className="text-green-400"
-            />
-          </svg>
+          <div className="text-xs">
+            <span>Last: ${formatPrice(currentPrice)}</span>
+            <span className={`ml-2 ${priceChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              {priceChange >= 0 ? '+' : ''}{formatPrice(priceChange)}
+            </span>
+          </div>
         </div>
-        <div className="text-xs text-gray-400 mt-2 grid grid-cols-5">
-          <div>9:30</div>
-          <div>10:00</div>
-          <div>10:30</div>
-          <div>11:00</div>
-          <div>11:30</div>
+      </div>
+      <div className="relative h-full p-2">
+        <div className="h-full flex flex-col">
+          <div className="flex-1 relative">
+            {/* Chart grid */}
+            <div className="absolute inset-0 grid grid-cols-10 grid-rows-8 border-r border-b border-green-800">
+              {Array.from({ length: 80 }).map((_, i) => (
+                <div key={i} className="border-l border-t border-green-800 opacity-20"></div>
+              ))}
+            </div>
+            {/* Price line */}
+            <svg className="absolute inset-0 w-full h-full">
+              <polyline
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                points={generatePath()}
+                className={priceChange >= 0 ? "text-green-400" : "text-red-400"}
+              />
+              {/* Current price indicator */}
+              {priceHistory.length > 0 && (
+                <circle
+                  cx="400"
+                  cy={200 - ((currentPrice - Math.min(...priceHistory)) / 
+                    (Math.max(...priceHistory) - Math.min(...priceHistory) || 1)) * 200}
+                  r="3"
+                  fill="currentColor"
+                  className="text-yellow-400"
+                />
+              )}
+            </svg>
+            {/* Price scale */}
+            <div className="absolute right-1 top-0 h-full flex flex-col justify-between text-xs text-gray-400">
+              <div>{formatPrice(Math.max(...priceHistory))}</div>
+              <div>{formatPrice((Math.max(...priceHistory) + Math.min(...priceHistory)) / 2)}</div>
+              <div>{formatPrice(Math.min(...priceHistory))}</div>
+            </div>
+          </div>
+          {/* Time axis */}
+          <div className="text-xs text-gray-400 mt-2 grid grid-cols-6 px-2">
+            <div>-50s</div>
+            <div>-40s</div>
+            <div>-30s</div>
+            <div>-20s</div>
+            <div>-10s</div>
+            <div>Now</div>
+          </div>
+        </div>
+        {/* Live indicator */}
+        <div className="absolute top-4 right-4 flex items-center text-xs">
+          <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse mr-1"></div>
+          Live
         </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 const RiskManagementWindow = ({ windowId }: { windowId: string }) => (
   <div className="h-full bg-red-900 text-white text-sm overflow-auto">
