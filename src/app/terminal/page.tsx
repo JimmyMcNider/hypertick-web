@@ -13,6 +13,7 @@ import { io, Socket } from 'socket.io-client';
 
 // Trading Window Components
 import SimpleTradingTerminal from '@/components/trading/SimpleTradingTerminal';
+import ProfessionalTradingWorkspace from '@/components/trading/ProfessionalTradingWorkspace';
 import MarketDataPanel from '@/components/terminal/MarketDataPanel';
 import OrderEntryPanel from '@/components/terminal/OrderEntryPanel';
 import PortfolioPanel from '@/components/terminal/PortfolioPanel';

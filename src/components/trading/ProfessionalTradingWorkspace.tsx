@@ -386,7 +386,7 @@ export default function ProfessionalTradingWorkspace({
             {/* Window Title Bar */}
             <div 
               className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-3 py-2 flex items-center justify-between cursor-move"
-              ref={el => dragRefs.current[window.id] = el}
+              ref={el => { dragRefs.current[window.id] = el; }}
             >
               <div className="flex items-center gap-2">
                 {window.icon && <window.icon size={16} />}
