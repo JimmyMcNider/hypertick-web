@@ -798,14 +798,36 @@ export default function ProfessionalTradingWorkspace({
 }: ProfessionalTradingWorkspaceProps) {
   const [currentTheme, setCurrentTheme] = useState<keyof typeof TRADING_THEMES>('classic');
   const [windows, setWindows] = useState<TradingWindow[]>([
-    // Top row - Small support windows
+    // Row 1: Left side - Order Window (MOST IMPORTANT)
+    {
+      id: 'market-order',
+      title: 'Market Order Window',
+      component: MarketOrderWindow,
+      isMinimized: false,
+      isMaximized: false,
+      position: { x: 10, y: 10, width: 500, height: 350, zIndex: 1 },
+      icon: TrendingUp
+    },
+    
+    // Row 1: Right side - Market Graph (SECOND MOST IMPORTANT)
+    {
+      id: 'market-graph',
+      title: 'Market Graph',
+      component: MarketGraphWindow,
+      isMinimized: false,
+      isMaximized: false,
+      position: { x: 520, y: 10, width: 620, height: 350, zIndex: 1 },
+      icon: LineChart
+    },
+    
+    // Row 2: Four equal small windows
     {
       id: 'portfolio',
       title: 'Portfolio',
       component: PortfolioWindow,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 10, y: 10, width: 200, height: 140, zIndex: 1 },
+      position: { x: 10, y: 370, width: 280, height: 160, zIndex: 1 },
       icon: DollarSign
     },
     {
@@ -814,17 +836,8 @@ export default function ProfessionalTradingWorkspace({
       component: BuyingPowerWindow,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 220, y: 10, width: 180, height: 140, zIndex: 1 },
+      position: { x: 300, y: 370, width: 280, height: 160, zIndex: 1 },
       icon: Activity
-    },
-    {
-      id: 'news',
-      title: 'News',
-      component: NewsWindow,
-      isMinimized: false,
-      isMaximized: false,
-      position: { x: 410, y: 10, width: 250, height: 140, zIndex: 1 },
-      icon: FileText
     },
     {
       id: 'market-watch',
@@ -832,38 +845,27 @@ export default function ProfessionalTradingWorkspace({
       component: MarketWatchWindow,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 670, y: 10, width: 220, height: 140, zIndex: 1 },
+      position: { x: 590, y: 370, width: 280, height: 160, zIndex: 1 },
       icon: BarChart3
     },
-    
-    // Main row - LARGE trading windows (Order Window and Market Graph)
     {
-      id: 'market-order',
-      title: 'Market Order Window',
-      component: MarketOrderWindow,
+      id: 'news',
+      title: 'News',
+      component: NewsWindow,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 10, y: 160, width: 420, height: 320, zIndex: 1 },
-      icon: TrendingUp
-    },
-    {
-      id: 'market-graph',
-      title: 'Market Graph',
-      component: MarketGraphWindow,
-      isMinimized: false,
-      isMaximized: false,
-      position: { x: 440, y: 160, width: 450, height: 320, zIndex: 1 },
-      icon: LineChart
+      position: { x: 880, y: 370, width: 260, height: 160, zIndex: 1 },
+      icon: FileText
     },
     
-    // Bottom row - Small support windows
+    // Row 3: Four small windows
     {
       id: 'order-log',
       title: 'Order Log',
       component: OrderLogWindow,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 10, y: 490, width: 200, height: 120, zIndex: 1 },
+      position: { x: 10, y: 540, width: 280, height: 130, zIndex: 1 },
       icon: FileText
     },
     {
@@ -872,7 +874,7 @@ export default function ProfessionalTradingWorkspace({
       component: RiskManagementWindow,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 220, y: 490, width: 210, height: 120, zIndex: 1 },
+      position: { x: 300, y: 540, width: 280, height: 130, zIndex: 1 },
       icon: Shield
     },
     {
@@ -881,7 +883,7 @@ export default function ProfessionalTradingWorkspace({
       component: AuctionWindow,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 440, y: 490, width: 220, height: 120, zIndex: 1 },
+      position: { x: 590, y: 540, width: 280, height: 130, zIndex: 1 },
       icon: Zap
     },
     {
@@ -890,7 +892,7 @@ export default function ProfessionalTradingWorkspace({
       component: (props: any) => <ThemeControlWindow {...props} onThemeChange={setCurrentTheme} />,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 670, y: 490, width: 220, height: 120, zIndex: 1 },
+      position: { x: 880, y: 540, width: 260, height: 130, zIndex: 1 },
       icon: Palette
     }
   ]);
