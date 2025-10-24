@@ -35,15 +35,15 @@ export const GET = requireAuth(async (request: NextRequest & { user: any }) => {
     // Transform XML lessons to match API format
     const formattedXmlLessons = xmlLessons.map(lesson => ({
       id: lesson.id,
-      name: lesson.title,
-      description: lesson.description,
-      difficulty: lesson.difficulty,
-      estimatedDuration: lesson.estimatedDuration,
-      scenarios: Object.keys(lesson.scenarios),
+      name: lesson.name,
+      description: lesson.metadata?.objectives?.join(', ') || 'No description available',
+      difficulty: lesson.metadata?.difficulty || 'INTERMEDIATE',
+      estimatedDuration: lesson.metadata?.estimatedDuration || 45,
+      scenarios: Object.keys(lesson.simulations || {}),
       type: 'XML_LESSON',
       metadata: lesson.metadata,
-      createdAt: lesson.created,
-      updatedAt: lesson.created
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     }));
 
     return NextResponse.json({ 

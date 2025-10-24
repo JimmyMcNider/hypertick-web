@@ -12,6 +12,8 @@ import { enhancedSessionEngine, ActiveSession, SessionParticipant } from './enha
 import { authService } from './auth';
 import { prisma } from './db';
 import { tradingEngine } from './trading-engine';
+import { marketDataService } from './market-data-service';
+import { positionService } from './position-service';
 import { getRedisClient, setSession, getSession } from './redis';
 
 interface AuthenticatedSocket extends Socket {
@@ -80,6 +82,8 @@ export class WebSocketServer {
     this.setupEventHandlers();
     this.setupSessionEngineListeners();
     this.setupTradingEngineListeners();
+    this.setupMarketDataListeners();
+    this.setupPositionServiceListeners();
   }
 
   /**
@@ -276,10 +280,27 @@ export class WebSocketServer {
         }
 
         try {
-          const positions = tradingEngine.getUserPositions(socket.userId);
-          socket.emit('portfolio_update', { positions });
+          const portfolio = positionService.getPortfolio(socket.userId);
+          const positions = positionService.getPositions(socket.userId);
+          socket.emit('portfolio_update', { portfolio, positions });
         } catch (error) {
           socket.emit('error', { error: 'Portfolio retrieval failed' });
+        }
+      });
+
+      // Get risk metrics
+      socket.on('get_risk_metrics', (data: any) => {
+        if (!socket.userId) {
+          socket.emit('error', { error: 'Not authenticated' });
+          return;
+        }
+
+        try {
+          // Risk metrics will be calculated and sent via position service events
+          const portfolio = positionService.getPortfolio(socket.userId);
+          socket.emit('risk_metrics_response', { portfolio });
+        } catch (error) {
+          socket.emit('error', { error: 'Risk metrics retrieval failed' });
         }
       });
 
@@ -331,6 +352,61 @@ export class WebSocketServer {
         }
       });
 
+      // News injection
+      socket.on('inject_news', (newsData: { symbol?: string; title: string; content: string; impact: 'POSITIVE' | 'NEGATIVE' | 'NEUTRAL'; severity: 'LOW' | 'MEDIUM' | 'HIGH'; duration: number }) => {
+        if (socket.userRole !== 'INSTRUCTOR' && socket.userRole !== 'ADMIN') {
+          socket.emit('error', { error: 'Insufficient permissions' });
+          return;
+        }
+
+        if (!socket.sessionId) {
+          socket.emit('error', { error: 'Not in session' });
+          return;
+        }
+
+        try {
+          marketDataService.injectNewsEvent(socket.sessionId, newsData);
+          socket.emit('news_injected', { success: true });
+        } catch (error) {
+          socket.emit('error', { error: 'Failed to inject news' });
+        }
+      });
+
+      // Price shock
+      socket.on('create_price_shock', (shockData: { symbol: string; magnitude: number; direction: 'UP' | 'DOWN' }) => {
+        if (socket.userRole !== 'INSTRUCTOR' && socket.userRole !== 'ADMIN') {
+          socket.emit('error', { error: 'Insufficient permissions' });
+          return;
+        }
+
+        if (!socket.sessionId) {
+          socket.emit('error', { error: 'Not in session' });
+          return;
+        }
+
+        try {
+          marketDataService.createPriceShock(socket.sessionId, shockData.symbol, shockData.magnitude, shockData.direction);
+          socket.emit('price_shock_created', { success: true });
+        } catch (error) {
+          socket.emit('error', { error: 'Failed to create price shock' });
+        }
+      });
+
+      // Market summary request
+      socket.on('get_market_summary', () => {
+        if (!socket.sessionId) {
+          socket.emit('error', { error: 'Not in session' });
+          return;
+        }
+
+        try {
+          const summary = marketDataService.getMarketSummary(socket.sessionId);
+          socket.emit('market_summary', summary);
+        } catch (error) {
+          socket.emit('error', { error: 'Failed to get market summary' });
+        }
+      });
+
       // Start market simulation
       socket.on('start_market', async (data: { symbols?: string[] }) => {
         if (socket.userRole !== 'INSTRUCTOR' && socket.userRole !== 'ADMIN') {
@@ -346,6 +422,7 @@ export class WebSocketServer {
         try {
           const symbols = data.symbols || ['AOE', 'BOND1', 'BOND2'];
           tradingEngine.startMarketSimulation(socket.sessionId, symbols);
+          marketDataService.startDataFeed(socket.sessionId, symbols);
           socket.emit('market_start_response', { success: true, symbols });
         } catch (error) {
           socket.emit('error', { error: 'Failed to start market' });
@@ -366,6 +443,7 @@ export class WebSocketServer {
 
         try {
           tradingEngine.stopMarketSimulation(socket.sessionId);
+          marketDataService.stopDataFeed(socket.sessionId);
           socket.emit('market_stop_response', { success: true });
         } catch (error) {
           socket.emit('error', { error: 'Failed to stop market' });
@@ -403,7 +481,7 @@ export class WebSocketServer {
         status: data.session.status,
         startTime: data.session.startTime,
         lesson: {
-          title: data.session.currentLesson.title,
+          title: data.session.currentLesson.name,
           scenario: data.session.scenario
         }
       });
@@ -691,9 +769,132 @@ export class WebSocketServer {
     await enhancedSessionEngine.executeCommand(sessionId, { 
       id: `cmd-${Date.now()}`,
       type: command as any,
-      timestamp: 0,
       description: `Instructor command: ${command}`,
       parameters 
+    });
+  }
+
+  /**
+   * Setup market data service event listeners
+   */
+  private setupMarketDataListeners(): void {
+    // Real-time market data updates
+    marketDataService.on('market_data', (data: { sessionId: string; symbol: string; data: any }) => {
+      this.broadcastToSession(data.sessionId, 'market_data', {
+        symbol: data.symbol,
+        ...data.data
+      });
+    });
+
+    // Market feed started
+    marketDataService.on('feed_started', (data: { sessionId: string; symbols: string[] }) => {
+      this.broadcastToSession(data.sessionId, 'market_feed_started', {
+        symbols: data.symbols,
+        timestamp: new Date()
+      });
+    });
+
+    // Market feed stopped
+    marketDataService.on('feed_stopped', (data: { sessionId: string }) => {
+      this.broadcastToSession(data.sessionId, 'market_feed_stopped', {
+        timestamp: new Date()
+      });
+    });
+
+    // News events
+    marketDataService.on('news_event', (data: { sessionId: string; event: any }) => {
+      this.broadcastToSession(data.sessionId, 'news_update', data.event);
+    });
+
+    // Price shocks
+    marketDataService.on('price_shock', (data: { sessionId: string; symbol: string; magnitude: number; direction: string; newPrice: number }) => {
+      this.broadcastToSession(data.sessionId, 'price_shock', {
+        symbol: data.symbol,
+        magnitude: data.magnitude,
+        direction: data.direction,
+        newPrice: data.newPrice,
+        timestamp: new Date()
+      });
+    });
+
+    // Trading halts
+    marketDataService.on('trading_halt', (data: { symbol: string; timestamp: Date }) => {
+      this.io.emit('trading_halt', data);
+    });
+
+    // Trading resumed
+    marketDataService.on('trading_resumed', (data: { symbol: string; timestamp: Date }) => {
+      this.io.emit('trading_resumed', data);
+    });
+
+    // Market events
+    marketDataService.on('market_event_executed', (data: { event: any }) => {
+      this.io.emit('market_event', data.event);
+    });
+
+    // Market reset
+    marketDataService.on('market_reset', (data: { symbols: string[] }) => {
+      this.io.emit('market_reset', {
+        symbols: data.symbols,
+        timestamp: new Date()
+      });
+    });
+  }
+
+  /**
+   * Setup position service event listeners
+   */
+  private setupPositionServiceListeners(): void {
+    // Portfolio initialization
+    positionService.on('portfolio_initialized', (data: { userId: string; portfolio: any }) => {
+      this.sendToUser(data.userId, 'portfolio_initialized', data.portfolio);
+    });
+
+    // Trade processed
+    positionService.on('trade_processed', (data: { trade: any }) => {
+      // Broadcast trade to session participants
+      if (data.trade.sessionId) {
+        this.broadcastToSession(data.trade.sessionId, 'trade_processed', data.trade);
+      }
+    });
+
+    // Position updates
+    positionService.on('position_updated', (data: { userId: string; symbol: string; position?: any }) => {
+      const portfolio = positionService.getPortfolio(data.userId);
+      const positions = positionService.getPositions(data.userId);
+      
+      this.sendToUser(data.userId, 'position_update', {
+        symbol: data.symbol,
+        position: data.position,
+        portfolio,
+        positions
+      });
+    });
+
+    // Portfolio updates
+    positionService.on('portfolio_updated', (data: { userId: string }) => {
+      const portfolio = positionService.getPortfolio(data.userId);
+      const positions = positionService.getPositions(data.userId);
+      
+      this.sendToUser(data.userId, 'portfolio_update', {
+        portfolio,
+        positions
+      });
+    });
+
+    // Risk metric updates
+    positionService.on('risk_updated', (data: { userId: string; metrics: any }) => {
+      this.sendToUser(data.userId, 'risk_metrics_update', data.metrics);
+    });
+
+    // Position liquidation
+    positionService.on('positions_liquidated', (data: { userId: string }) => {
+      const portfolio = positionService.getPortfolio(data.userId);
+      
+      this.sendToUser(data.userId, 'positions_liquidated', {
+        message: 'All positions have been liquidated',
+        portfolio
+      });
     });
   }
 

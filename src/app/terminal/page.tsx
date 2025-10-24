@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation';
 import { io, Socket } from 'socket.io-client';
 
 // Trading Window Components
+import SimpleTradingTerminal from '@/components/trading/SimpleTradingTerminal';
 import MarketDataPanel from '@/components/terminal/MarketDataPanel';
 import OrderEntryPanel from '@/components/terminal/OrderEntryPanel';
 import PortfolioPanel from '@/components/terminal/PortfolioPanel';
@@ -21,8 +22,8 @@ import NewsPanel from '@/components/terminal/NewsPanel';
 import AnalysisPanel from '@/components/terminal/AnalysisPanel';
 import InstructorPanel from '@/components/terminal/InstructorPanel';
 import ChartPanel from '@/components/terminal/ChartPanel';
-import AuctionPanel from '@/components/terminal/AuctionPanel';
 import RiskPanel from '@/components/terminal/RiskPanel';
+import AuctionPanel from '@/components/terminal/AuctionPanel';
 import OptionsPanel from '@/components/terminal/OptionsPanel';
 import CommoditiesPanel from '@/components/terminal/CommoditiesPanel';
 import LiquidityPanel from '@/components/terminal/LiquidityPanel';
@@ -359,10 +360,12 @@ export default function TradingTerminal() {
     );
   }
 
+  const token = localStorage.getItem('auth_token') || '';
+
   return (
-    <div className="h-screen bg-black text-green-400 font-mono overflow-hidden relative">
-      {/* Bloomberg-style Header Bar */}
-      <div className="bg-orange-600 text-black px-4 py-1 flex justify-between items-center text-sm font-bold">
+    <div className="h-screen bg-gray-900 overflow-hidden">
+      {/* Header */}
+      <div className="bg-orange-600 text-black px-4 py-2 flex justify-between items-center text-sm font-bold">
         <div className="flex items-center space-x-6">
           <span className="text-lg">HYPERTICK TERMINAL</span>
           <span>USER: {user?.username?.toUpperCase()}</span>
@@ -387,54 +390,13 @@ export default function TradingTerminal() {
         </div>
       </div>
 
-      {/* Window Toggle Bar */}
-      <div className="bg-gray-800 border-b border-gray-700 px-4 py-2 flex space-x-2 text-xs">
-        {defaultWindows.map((window) => {
-          const hasPrivilege = user?.privileges?.includes(window.privilegeCode) || 
-                             user?.role === 'INSTRUCTOR' || user?.role === 'ADMIN';
-          const isVisible = windows.find(w => w.privilegeCode === window.privilegeCode)?.isVisible;
-          
-          return (
-            <button
-              key={window.privilegeCode}
-              onClick={() => toggleWindow(`window-${window.privilegeCode}`)}
-              disabled={!hasPrivilege}
-              className={`px-3 py-1 rounded text-xs border transition-colors ${
-                hasPrivilege
-                  ? isVisible
-                    ? 'bg-blue-600 border-blue-500 text-white'
-                    : 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600'
-                  : 'bg-gray-900 border-gray-800 text-gray-600 cursor-not-allowed'
-              }`}
-            >
-              {window.title.toUpperCase()}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Trading Windows */}
-      <div 
-        className="relative h-full overflow-auto" 
-        style={{ minHeight: 'calc(100vh - 120px)' }}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-      >
-        {windows.map(renderWindow)}
-      </div>
-
-      {/* Status Bar */}
-      <div className="absolute bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-700 px-4 py-1 flex justify-between items-center text-xs">
-        <div className="flex space-x-4">
-          <span>WINDOWS: {windows.filter(w => w.isVisible).length}</span>
-          <span>SESSION: {sessionState?.id || 'NONE'}</span>
-          <span>STATUS: {sessionState?.status || 'DISCONNECTED'}</span>
-        </div>
-        <div className="flex space-x-4">
-          <span>WS: {socket?.connected ? 'CONNECTED' : 'DISCONNECTED'}</span>
-          <span>TIME: {new Date().toLocaleTimeString()}</span>
-        </div>
+      {/* Enhanced Trading Terminal */}
+      <div className="h-[calc(100vh-50px)]">
+        <SimpleTradingTerminal
+          sessionId={sessionState?.id || 'demo-session'}
+          userId={user?.id || ''}
+          token={token}
+        />
       </div>
     </div>
   );

@@ -80,7 +80,7 @@ export const GET = requireAuth(async (request: NextRequest & { user: any }) => {
     const sessionData = filteredSessions.map(session => ({
       id: session.id,
       lessonId: session.lessonId,
-      lessonTitle: session.currentLesson.title,
+      lessonTitle: session.currentLesson.name,
       scenario: session.scenario,
       classId: session.classId,
       status: session.status,
@@ -145,7 +145,7 @@ async function createEnhancedSession(lessonId: string, scenario: string, classId
       lessonId: lessonId,
       classId: classId,
       scenario: scenario,
-      duration: lesson.scenarios[scenario].duration,
+      duration: lesson.simulations[scenario]?.duration || 3600,
       status: 'PENDING'
     }
   });
@@ -153,10 +153,10 @@ async function createEnhancedSession(lessonId: string, scenario: string, classId
   return NextResponse.json({ 
     session: {
       id: session.id,
-      lessonTitle: lesson.title,
+      lessonTitle: lesson.name,
       scenario: scenario,
       status: session.status,
-      duration: lesson.scenarios[scenario].duration
+      duration: lesson.simulations[scenario]?.duration || 3600
     },
     message: 'Session created successfully' 
   });
@@ -275,7 +275,7 @@ async function getSessionStatus(sessionId: string) {
     session: {
       id: session.id,
       lessonId: session.lessonId,
-      lessonTitle: session.currentLesson.title,
+      lessonTitle: session.currentLesson.name,
       scenario: session.scenario,
       status: session.status,
       startTime: session.startTime,

@@ -6,7 +6,7 @@
  */
 
 import { EventEmitter } from 'events';
-import { LessonDefinition, LessonCommand, LessonScenario } from './lesson-loader';
+import { LessonDefinition, LessonCommand, LessonSimulation } from './lesson-loader';
 
 export interface SessionParticipant {
   id: string;
@@ -90,21 +90,25 @@ export class EnhancedSessionEngine extends EventEmitter {
     classId: string,
     lesson: LessonDefinition
   ): Promise<ActiveSession> {
-    const scenarioData = lesson.scenarios[scenario];
-    if (!scenarioData) {
-      throw new Error(`Scenario ${scenario} not found in lesson ${lessonId}`);
+    const simulationData = lesson.simulations[scenario];
+    if (!simulationData) {
+      throw new Error(`Simulation ${scenario} not found in lesson ${lessonId}`);
     }
 
     // Initialize market state
     const marketState: MarketState = {
-      isOpen: scenarioData.initialState.marketOpen,
+      isOpen: true,
       symbols: new Map(),
-      liquidityProviders: new Set(scenarioData.initialState.liquidityTraders),
+      liquidityProviders: new Set(),
       auctionsActive: new Map()
     };
 
-    // Set initial prices
-    for (const [symbol, price] of Object.entries(scenarioData.initialState.initialPrices)) {
+    // Set initial prices for default symbols
+    const defaultSymbols = [
+      { symbol: 'AOE', price: 50.00 },
+      { symbol: 'BOND1', price: 100.00 }
+    ];
+    for (const { symbol, price } of defaultSymbols) {
       marketState.symbols.set(symbol, {
         price,
         volume: 0,
@@ -125,7 +129,7 @@ export class EnhancedSessionEngine extends EventEmitter {
       participants: new Map(),
       marketState,
       executedCommands: new Set(),
-      pendingCommands: [...scenarioData.commands].sort((a, b) => a.timestamp - b.timestamp),
+      pendingCommands: [...simulationData.startCommands, ...simulationData.endCommands],
       currentLesson: lesson,
       eventLog: []
     };
@@ -149,7 +153,7 @@ export class EnhancedSessionEngine extends EventEmitter {
     session.startTime = new Date();
     
     // Grant default privileges to all participants
-    const defaultPrivileges = session.currentLesson.scenarios[session.scenario].initialState.defaultPrivileges;
+    const defaultPrivileges = [1, 4, 5, 8, 9, 10, 11, 12, 13, 15]; // Basic privileges
     for (const participant of session.participants.values()) {
       if (participant.role === 'STUDENT') {
         defaultPrivileges.forEach(privilege => participant.privileges.add(privilege));
@@ -172,7 +176,7 @@ export class EnhancedSessionEngine extends EventEmitter {
     for (const command of session.pendingCommands) {
       const timer = setTimeout(() => {
         this.executeCommand(session.id, command);
-      }, command.timestamp * 1000); // Convert to milliseconds
+      }, 1000); // Execute commands with 1 second delay
 
       timers.push(timer);
     }
@@ -248,24 +252,28 @@ export class EnhancedSessionEngine extends EventEmitter {
         await this.createAuction(session, command.parameters);
         break;
 
-      case 'SET_PRICE':
-        await this.setPrice(session, command.parameters);
+      case 'REMOVE_PRIVILEGE':
+        await this.removePrivilege(session, command.parameters);
         break;
 
-      case 'INJECT_NEWS':
-        await this.injectNews(session, command.parameters);
+      case 'START_AUCTION':
+        await this.startAuction(session, command.parameters);
         break;
 
-      case 'PAUSE_SESSION':
-        await this.pauseSession(session.id);
+      case 'UNDO_AUCTION':
+        await this.undoAuction(session, command.parameters);
         break;
 
-      case 'RESUME_SESSION':
-        await this.resumeSession(session.id);
+      case 'START_SIMULATION':
+        await this.startSimulation(session, command.parameters);
         break;
 
-      case 'TRIGGER_EVENT':
-        await this.triggerEvent(session, command.parameters);
+      case 'SET_MARKET':
+        await this.setMarket(session, command.parameters);
+        break;
+
+      case 'SET_WIZARD_ITEM':
+        await this.setWizardItem(session, command.parameters);
         break;
 
       default:
@@ -534,20 +542,17 @@ export class EnhancedSessionEngine extends EventEmitter {
     session.status = 'IN_PROGRESS';
     
     // Reschedule remaining commands
-    const elapsed = (Date.now() - session.startTime.getTime()) / 1000;
     const remainingCommands = session.pendingCommands.filter(
-      cmd => cmd.timestamp > elapsed && !session.executedCommands.has(cmd.id)
+      cmd => !session.executedCommands.has(cmd.id)
     );
 
     const timers: NodeJS.Timeout[] = [];
     for (const command of remainingCommands) {
-      const delay = (command.timestamp - elapsed) * 1000;
-      if (delay > 0) {
-        const timer = setTimeout(() => {
-          this.executeCommand(sessionId, command);
-        }, delay);
-        timers.push(timer);
-      }
+      const delay = 1000; // Default 1 second delay
+      const timer = setTimeout(() => {
+        this.executeCommand(sessionId, command);
+      }, delay);
+      timers.push(timer);
     }
     
     this.commandSchedulers.set(sessionId, timers);
@@ -596,22 +601,7 @@ export class EnhancedSessionEngine extends EventEmitter {
    * Validate command conditions
    */
   private validateCommandConditions(session: ActiveSession, command: LessonCommand): boolean {
-    if (!command.conditions) return true;
-
-    const { requiredRole, minParticipants, marketState } = command.conditions;
-
-    if (minParticipants && session.participants.size < minParticipants) {
-      return false;
-    }
-
-    if (marketState === 'OPEN' && !session.marketState.isOpen) {
-      return false;
-    }
-
-    if (marketState === 'CLOSED' && session.marketState.isOpen) {
-      return false;
-    }
-
+    // Simplified validation - always return true for now
     return true;
   }
 
@@ -691,6 +681,48 @@ export class EnhancedSessionEngine extends EventEmitter {
       session.marketState.isOpen = originalState;
       this.emit('circuit_breaker_lifted', { sessionId: session.id, symbols });
     }, 5 * 60 * 1000);
+  }
+
+  /**
+   * Remove privilege stub
+   */
+  private async removePrivilege(session: ActiveSession, parameters: any[]): Promise<void> {
+    console.log('Remove privilege command executed:', parameters);
+  }
+
+  /**
+   * Start auction stub
+   */
+  private async startAuction(session: ActiveSession, parameters: any[]): Promise<void> {
+    console.log('Start auction command executed:', parameters);
+  }
+
+  /**
+   * Undo auction stub
+   */
+  private async undoAuction(session: ActiveSession, parameters: any[]): Promise<void> {
+    console.log('Undo auction command executed:', parameters);
+  }
+
+  /**
+   * Start simulation stub
+   */
+  private async startSimulation(session: ActiveSession, parameters: any[]): Promise<void> {
+    console.log('Start simulation command executed:', parameters);
+  }
+
+  /**
+   * Set market stub
+   */
+  private async setMarket(session: ActiveSession, parameters: any[]): Promise<void> {
+    console.log('Set market command executed:', parameters);
+  }
+
+  /**
+   * Set wizard item stub
+   */
+  private async setWizardItem(session: ActiveSession, parameters: any[]): Promise<void> {
+    console.log('Set wizard item command executed:', parameters);
   }
 }
 

@@ -7,6 +7,7 @@
 
 import { EventEmitter } from 'events';
 import { prisma } from './prisma';
+import { positionService } from './position-service';
 
 export interface Order {
   id: string;
@@ -205,6 +206,9 @@ export class TradingEngine extends EventEmitter {
 
     this.marketData.set(symbol, updatedData);
     
+    // Update position service with new price
+    positionService.updateMarketPrice(symbol, newLast);
+    
     // Update order book
     this.updateOrderBook(symbol, newLast);
     
@@ -316,6 +320,103 @@ export class TradingEngine extends EventEmitter {
   }
 
   /**
+   * Get simplified order book for symbol
+   */
+  getSimpleOrderBook(symbol: string): { bids: Order[]; asks: Order[]; spread: number } {
+    const orders = Array.from(this.activeOrders.values())
+      .filter(order => order.symbol === symbol && order.status === 'PENDING');
+
+    const bids = orders
+      .filter(order => order.side === 'BUY' && order.type === 'LIMIT')
+      .sort((a, b) => (b.price || 0) - (a.price || 0)); // Highest price first
+
+    const asks = orders
+      .filter(order => order.side === 'SELL' && order.type === 'LIMIT')
+      .sort((a, b) => (a.price || 0) - (b.price || 0)); // Lowest price first
+
+    const bestBid = bids[0]?.price || 0;
+    const bestAsk = asks[0]?.price || 999999;
+    const spread = bestAsk - bestBid;
+
+    return { bids, asks, spread };
+  }
+
+  /**
+   * Execute market order against order book
+   */
+  private async executeMarketOrder(sessionId: string, order: Order): Promise<void> {
+    const orderBook = this.getSimpleOrderBook(order.symbol);
+    const counterOrders = order.side === 'BUY' ? orderBook.asks : orderBook.bids;
+
+    let remainingQuantity = order.quantity;
+    let totalFilled = 0;
+    let weightedPrice = 0;
+
+    for (const counterOrder of counterOrders) {
+      if (remainingQuantity <= 0) break;
+
+      const fillQuantity = Math.min(remainingQuantity, counterOrder.quantity - counterOrder.filledQuantity);
+      const fillPrice = counterOrder.price || 0;
+
+      // Fill both orders
+      await this.fillOrder(sessionId, order, fillQuantity, fillPrice);
+      await this.fillOrder(sessionId, counterOrder, fillQuantity, fillPrice);
+
+      totalFilled += fillQuantity;
+      weightedPrice += fillQuantity * fillPrice;
+      remainingQuantity -= fillQuantity;
+
+      // Emit trade event
+      this.emit('trade_executed', {
+        sessionId,
+        symbol: order.symbol,
+        price: fillPrice,
+        quantity: fillQuantity,
+        buyOrderId: order.side === 'BUY' ? order.id : counterOrder.id,
+        sellOrderId: order.side === 'SELL' ? order.id : counterOrder.id,
+        timestamp: new Date()
+      });
+    }
+
+    // Update market data
+    if (totalFilled > 0) {
+      const avgPrice = weightedPrice / totalFilled;
+      await this.updateMarketData(order.symbol, avgPrice, totalFilled);
+    }
+  }
+
+  /**
+   * Update real-time market data
+   */
+  private async updateMarketData(symbol: string, lastPrice: number, volume: number): Promise<void> {
+    try {
+      const security = await prisma.security.findFirst({ where: { symbol } });
+      if (!security) return;
+
+      // Update or create market data
+      await prisma.marketData.create({
+        data: {
+          securityId: security.id,
+          last: lastPrice,
+          volume: volume,
+          timestamp: new Date()
+        }
+      });
+
+      // Emit market data update
+      this.emit('market_data_update', {
+        symbol,
+        last: lastPrice,
+        volume,
+        timestamp: new Date()
+      });
+
+    } catch (error) {
+      console.error('Market data update error:', error);
+    }
+  }
+
+  /**
    * Validate order parameters
    */
   private validateOrder(orderData: any): { valid: boolean; error?: string } {
@@ -335,9 +436,9 @@ export class TradingEngine extends EventEmitter {
   }
 
   /**
-   * Execute market order immediately
+   * Execute market order immediately against best available prices
    */
-  private async executeMarketOrder(sessionId: string, order: Order): Promise<void> {
+  private async executeMarketOrderSimple(sessionId: string, order: Order): Promise<void> {
     const marketData = this.marketData.get(order.symbol);
     if (!marketData) {
       await this.rejectOrder(order, 'Invalid symbol');
@@ -375,8 +476,18 @@ export class TradingEngine extends EventEmitter {
       }
     });
 
-    // Update position
-    await this.updatePosition(sessionUser.userId, order.symbol, order.side, actualFillQuantity, fillPrice);
+    // Update position through position service
+    await positionService.processTrade({
+      userId: sessionUser.userId,
+      sessionId: sessionId,
+      symbol: order.symbol,
+      side: order.side,
+      quantity: actualFillQuantity,
+      price: fillPrice,
+      timestamp: new Date(),
+      commission: 0, // No commission for educational trading
+      orderId: order.id
+    });
 
     // Create trade record
     const trade: Trade = {
@@ -413,77 +524,10 @@ export class TradingEngine extends EventEmitter {
   }
 
   /**
-   * Update user position
+   * Initialize user positions for session (delegated to position service)
    */
-  private async updatePosition(sessionUserId: string, symbol: string, side: 'BUY' | 'SELL', quantity: number, price: number): Promise<void> {
-    const sessionUser = await prisma.sessionUser.findUnique({
-      where: { id: sessionUserId }
-    });
-
-    if (!sessionUser) return;
-
-    // Calculate position change
-    const positionChange = side === 'BUY' ? quantity : -quantity;
-    const cashChange = quantity * price * (side === 'BUY' ? -1 : 1);
-
-    // Update session user equity
-    await prisma.sessionUser.update({
-      where: { id: sessionUserId },
-      data: {
-        currentEquity: {
-          increment: cashChange
-        }
-      }
-    });
-
-    // Calculate new position (simplified - in production you'd track individual positions)
-    const userPositions = this.positions.get(sessionUser.userId) || new Map();
-    const currentPosition = userPositions.get(symbol) || {
-      userId: sessionUser.userId,
-      symbol,
-      quantity: 0,
-      avgPrice: 0,
-      marketValue: 0,
-      unrealizedPnL: 0,
-      realizedPnL: 0
-    };
-
-    // Update position
-    if (currentPosition.quantity === 0) {
-      currentPosition.quantity = positionChange;
-      currentPosition.avgPrice = price;
-    } else {
-      if ((currentPosition.quantity > 0 && side === 'BUY') || (currentPosition.quantity < 0 && side === 'SELL')) {
-        // Adding to position
-        const totalCost = currentPosition.avgPrice * Math.abs(currentPosition.quantity) + price * quantity;
-        currentPosition.quantity += positionChange;
-        currentPosition.avgPrice = totalCost / Math.abs(currentPosition.quantity);
-      } else {
-        // Reducing or reversing position
-        if (Math.abs(positionChange) >= Math.abs(currentPosition.quantity)) {
-          // Full closure or reversal
-          currentPosition.realizedPnL += (price - currentPosition.avgPrice) * Math.abs(currentPosition.quantity) * (currentPosition.quantity > 0 ? 1 : -1);
-          currentPosition.quantity = positionChange + currentPosition.quantity;
-          currentPosition.avgPrice = Math.abs(currentPosition.quantity) > 0 ? price : 0;
-        } else {
-          // Partial closure
-          currentPosition.realizedPnL += (price - currentPosition.avgPrice) * quantity * (currentPosition.quantity > 0 ? 1 : -1);
-          currentPosition.quantity += positionChange;
-        }
-      }
-    }
-
-    // Update market value and unrealized P&L
-    const currentMarketData = this.marketData.get(symbol);
-    if (currentMarketData) {
-      currentPosition.marketValue = Math.abs(currentPosition.quantity) * currentMarketData.last;
-      currentPosition.unrealizedPnL = (currentMarketData.last - currentPosition.avgPrice) * currentPosition.quantity;
-    }
-
-    userPositions.set(symbol, currentPosition);
-    this.positions.set(sessionUser.userId, userPositions);
-
-    this.emit('position_updated', { userId: sessionUser.userId, symbol, position: currentPosition });
+  public async initializeUserPositions(userId: string, sessionId: string, startingEquity: number = 100000): Promise<void> {
+    await positionService.initializeUserPositions(userId, sessionId, startingEquity);
   }
 
   /**
@@ -535,11 +579,17 @@ export class TradingEngine extends EventEmitter {
   }
 
   /**
-   * Get user positions
+   * Get user positions (delegated to position service)
    */
-  public getUserPositions(userId: string): Position[] {
-    const userPositions = this.positions.get(userId);
-    return userPositions ? Array.from(userPositions.values()) : [];
+  public getUserPositions(userId: string): any[] {
+    return positionService.getPositions(userId);
+  }
+
+  /**
+   * Get user portfolio summary (delegated to position service)
+   */
+  public getUserPortfolio(userId: string): any {
+    return positionService.getPortfolio(userId);
   }
 
   /**

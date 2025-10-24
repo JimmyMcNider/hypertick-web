@@ -8,7 +8,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { lessonLoader, LessonDefinition, LessonScenario } from '@/lib/lesson-loader';
+import { lessonLoader, LessonDefinition, LessonSimulation } from '@/lib/lesson-loader';
 import { enhancedSessionEngine, ActiveSession, SessionParticipant } from '@/lib/enhanced-session-engine';
 
 interface LessonManagerProps {
@@ -126,7 +126,7 @@ export default function LessonManager({ user, classId, socket }: LessonManagerPr
 
       // Update local state
       setActiveSession(createData.session);
-      addLog(`Session started: ${selectedLesson.title} - Scenario ${selectedScenario}`);
+      addLog(`Session started: ${selectedLesson.name} - Scenario ${selectedScenario}`);
 
       // Notify via socket
       if (socket) {
@@ -320,7 +320,7 @@ export default function LessonManager({ user, classId, socket }: LessonManagerPr
                       const lesson = availableLessons.find(l => l.id === e.target.value);
                       setSelectedLesson(lesson || null);
                       if (lesson) {
-                        setSelectedScenario(lesson.defaultScenario);
+                        setSelectedScenario(Object.keys(lesson.simulations)[0] || 'Simulation A');
                       }
                     }}
                     className="w-full border border-gray-300 rounded-md px-3 py-2"
@@ -328,7 +328,7 @@ export default function LessonManager({ user, classId, socket }: LessonManagerPr
                     <option value="">Select a lesson...</option>
                     {availableLessons.map((lesson) => (
                       <option key={lesson.id} value={lesson.id}>
-                        {lesson.title} ({lesson.difficulty})
+                        {lesson.name} ({lesson.metadata?.difficulty || 'Unknown'})
                       </option>
                     ))}
                   </select>
@@ -345,9 +345,9 @@ export default function LessonManager({ user, classId, socket }: LessonManagerPr
                         onChange={(e) => setSelectedScenario(e.target.value)}
                         className="w-full border border-gray-300 rounded-md px-3 py-2"
                       >
-                        {Object.entries(selectedLesson.scenarios).map(([key, scenario]) => (
+                        {Object.entries(selectedLesson.simulations).map(([key, simulation]) => (
                           <option key={key} value={key}>
-                            Scenario {key}: {scenario.name}
+                            {simulation.id}: {simulation.duration}s
                           </option>
                         ))}
                       </select>
@@ -355,11 +355,11 @@ export default function LessonManager({ user, classId, socket }: LessonManagerPr
 
                     <div className="mb-4 p-3 bg-gray-50 rounded">
                       <h3 className="font-medium text-gray-900 mb-2">Lesson Details</h3>
-                      <p className="text-sm text-gray-600 mb-2">{selectedLesson.description}</p>
+                      <p className="text-sm text-gray-600 mb-2">{selectedLesson.metadata?.objectives?.join(', ') || 'No description available'}</p>
                       <div className="text-xs text-gray-500">
-                        <div>Duration: {selectedLesson.estimatedDuration} minutes</div>
-                        <div>Difficulty: {selectedLesson.difficulty}</div>
-                        <div>Commands: {selectedLesson.scenarios[selectedScenario]?.commands.length || 0}</div>
+                        <div>Duration: {selectedLesson.metadata?.estimatedDuration || 0} minutes</div>
+                        <div>Difficulty: {selectedLesson.metadata?.difficulty || 'Unknown'}</div>
+                        <div>Commands: {(selectedLesson.simulations[selectedScenario]?.startCommands.length || 0) + (selectedLesson.simulations[selectedScenario]?.endCommands.length || 0)}</div>
                       </div>
                     </div>
 
@@ -377,7 +377,7 @@ export default function LessonManager({ user, classId, socket }: LessonManagerPr
               <div className="space-y-4">
                 <div className="p-3 bg-green-50 border border-green-200 rounded">
                   <div className="font-medium text-green-900">Active Session</div>
-                  <div className="text-sm text-green-700">{selectedLesson?.title}</div>
+                  <div className="text-sm text-green-700">{selectedLesson?.name}</div>
                   <div className="text-sm text-green-600">Scenario {activeSession.scenario}</div>
                   <div className="text-sm text-green-600">
                     Status: {activeSession.status} | Elapsed: {formatDuration(getSessionElapsed())}
@@ -481,36 +481,40 @@ export default function LessonManager({ user, classId, socket }: LessonManagerPr
                 <h3 className="font-medium text-gray-900 mb-2">Manual Commands</h3>
                 <div className="grid grid-cols-2 gap-2 mb-4">
                   <button
-                    onClick={() => executeManualCommand('OPEN_MARKET', { symbols: ['AOE', 'BOND1'] })}
+                    onClick={() => executeManualCommand('OPEN_MARKET', [5])}
                     className="bg-green-600 text-white py-1 px-2 text-sm rounded hover:bg-green-700"
                   >
                     Open Market
                   </button>
                   <button
-                    onClick={() => executeManualCommand('CLOSE_MARKET', {})}
+                    onClick={() => executeManualCommand('CLOSE_MARKET', [])}
                     className="bg-red-600 text-white py-1 px-2 text-sm rounded hover:bg-red-700"
                   >
                     Close Market
                   </button>
                   <button
-                    onClick={() => executeManualCommand('INJECT_NEWS', {
-                      headline: 'Breaking: Market volatility expected',
-                      impact: 'MEDIUM',
-                      source: 'INSTRUCTOR'
-                    })}
+                    onClick={() => executeManualCommand('GRANT_PRIVILEGE', [22])}
                     className="bg-blue-600 text-white py-1 px-2 text-sm rounded hover:bg-blue-700"
                   >
-                    Inject News
+                    Grant Market Making
                   </button>
                   <button
-                    onClick={() => executeManualCommand('CREATE_AUCTION', {
-                      symbol: 'AOE',
-                      duration: 120,
-                      minimumBid: 50.00
-                    })}
+                    onClick={() => executeManualCommand('CREATE_AUCTION', [22, 5, 1000, 1000, 30])}
                     className="bg-purple-600 text-white py-1 px-2 text-sm rounded hover:bg-purple-700"
                   >
-                    Start Auction
+                    Create Auction
+                  </button>
+                  <button
+                    onClick={() => executeManualCommand('SET_LIQUIDITY_TRADER', [1, 'Active', true])}
+                    className="bg-indigo-600 text-white py-1 px-2 text-sm rounded hover:bg-indigo-700"
+                  >
+                    Enable Liquidity
+                  </button>
+                  <button
+                    onClick={() => executeManualCommand('GRANT_PRIVILEGE', [23])}
+                    className="bg-yellow-600 text-white py-1 px-2 text-sm rounded hover:bg-yellow-700"
+                  >
+                    Grant Analyst Access
                   </button>
                 </div>
               </div>
