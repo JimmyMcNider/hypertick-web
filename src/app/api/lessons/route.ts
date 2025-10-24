@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { lessonLoader } from '@/lib/lesson-loader';
+import { legacyLessonImporter } from '@/lib/legacy-lesson-importer';
 
 // GET /api/lessons - List available lessons (both database and XML lessons)
 export const GET = requireAuth(async (request: NextRequest & { user: any }) => {
@@ -32,6 +33,9 @@ export const GET = requireAuth(async (request: NextRequest & { user: any }) => {
       xmlLessons = lessonLoader.getAvailableLessons();
     }
 
+    // Get legacy upTick lessons
+    const legacyLessons = await legacyLessonImporter.scanLegacyLessons();
+
     // Transform XML lessons to match API format
     const formattedXmlLessons = xmlLessons.map(lesson => ({
       id: lesson.id,
@@ -46,11 +50,29 @@ export const GET = requireAuth(async (request: NextRequest & { user: any }) => {
       updatedAt: new Date().toISOString()
     }));
 
+    // Transform legacy lessons to match API format
+    const formattedLegacyLessons = legacyLessons.map(lesson => ({
+      id: lesson.lessonId,
+      name: lesson.lessonName,
+      description: `Legacy upTick lesson: ${lesson.lessonName}`,
+      difficulty: lesson.difficulty,
+      estimatedDuration: lesson.estimatedDuration,
+      scenarios: [], // Will be populated when lesson is loaded
+      type: 'LEGACY_LESSON',
+      category: lesson.category,
+      hasExcelIntegration: !!lesson.excelPath,
+      hasReporting: !!lesson.reportingPath,
+      presentationFiles: lesson.pptFiles.length,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }));
+
     return NextResponse.json({ 
-      lessons: [...dbLessons, ...formattedXmlLessons],
+      lessons: [...dbLessons, ...formattedXmlLessons, ...formattedLegacyLessons],
       xmlLessons: formattedXmlLessons,
+      legacyLessons: formattedLegacyLessons,
       dbLessons: dbLessons,
-      total: dbLessons.length + xmlLessons.length
+      total: dbLessons.length + xmlLessons.length + legacyLessons.length
     });
 
   } catch (error: any) {

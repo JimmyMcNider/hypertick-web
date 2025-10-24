@@ -81,6 +81,10 @@ export interface LessonDefinition {
     estimatedDuration?: number;
     difficulty?: string;
     objectives?: string[];
+    category?: string;
+    hasExcelIntegration?: boolean;
+    hasReportingConfig?: boolean;
+    presentationFiles?: number;
   };
 }
 

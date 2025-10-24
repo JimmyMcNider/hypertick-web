@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { enhancedSessionEngine } from '@/lib/enhanced-session-engine';
 import { lessonLoader } from '@/lib/lesson-loader';
+import { legacyLessonImporter } from '@/lib/legacy-lesson-importer';
 import { prisma } from '@/lib/prisma';
 
 // POST /api/sessions/manage - Create and manage enhanced sessions
@@ -110,8 +111,14 @@ export const GET = requireAuth(async (request: NextRequest & { user: any }) => {
 });
 
 async function createEnhancedSession(lessonId: string, scenario: string, classId: string, instructorId: string) {
-  // Get lesson definition
-  const lesson = lessonLoader.getLesson(lessonId);
+  // Get lesson definition - try regular lesson loader first, then legacy importer
+  let lesson = lessonLoader.getLesson(lessonId);
+  
+  if (!lesson) {
+    // Try loading from legacy upTick lessons
+    lesson = await legacyLessonImporter.loadLegacyLesson(lessonId);
+  }
+  
   if (!lesson) {
     return NextResponse.json({ error: 'Lesson not found' }, { status: 404 });
   }
