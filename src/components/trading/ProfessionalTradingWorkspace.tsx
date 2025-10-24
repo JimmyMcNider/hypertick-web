@@ -17,8 +17,60 @@ import {
   FileText,
   Settings,
   Grid,
-  TrendingUp
+  TrendingUp,
+  LineChart,
+  Shield,
+  Zap,
+  Palette
 } from 'lucide-react';
+
+// Theme definitions
+export const TRADING_THEMES = {
+  classic: {
+    name: 'Classic Green',
+    background: 'bg-black',
+    text: 'text-green-400',
+    header: 'bg-gray-900',
+    border: 'border-green-400',
+    accent: 'text-green-400',
+    positive: 'text-green-400',
+    negative: 'text-red-400',
+    neutral: 'text-yellow-400'
+  },
+  bloomberg: {
+    name: 'Bloomberg Orange',
+    background: 'bg-gray-900',
+    text: 'text-orange-300',
+    header: 'bg-orange-800',
+    border: 'border-orange-400',
+    accent: 'text-orange-400',
+    positive: 'text-green-400',
+    negative: 'text-red-400',
+    neutral: 'text-orange-300'
+  },
+  professional: {
+    name: 'Professional Blue',
+    background: 'bg-slate-900',
+    text: 'text-blue-300',
+    header: 'bg-blue-800',
+    border: 'border-blue-400',
+    accent: 'text-blue-400',
+    positive: 'text-emerald-400',
+    negative: 'text-red-400',
+    neutral: 'text-slate-300'
+  },
+  highContrast: {
+    name: 'High Contrast',
+    background: 'bg-black',
+    text: 'text-white',
+    header: 'bg-gray-800',
+    border: 'border-white',
+    accent: 'text-cyan-400',
+    positive: 'text-lime-400',
+    negative: 'text-red-400',
+    neutral: 'text-yellow-300'
+  }
+};
 
 interface WindowPosition {
   x: number;
@@ -46,37 +98,42 @@ interface ProfessionalTradingWorkspaceProps {
 }
 
 // Professional Trading Window Components
-const PortfolioWindow = ({ windowId }: { windowId: string }) => (
-  <div className="h-full bg-black text-green-400 font-mono text-sm overflow-hidden">
-    <div className="grid grid-cols-7 gap-1 p-2 border-b border-green-400 bg-gray-900">
-      <div className="font-bold">Security</div>
-      <div className="font-bold text-right">Quantity</div>
-      <div className="font-bold text-right">Avg Price</div>
-      <div className="font-bold text-right">Last Price</div>
-      <div className="font-bold text-right">Value</div>
-      <div className="font-bold text-right">% Assets</div>
-      <div className="font-bold text-right">Gain</div>
-    </div>
-    <div className="p-2 space-y-1">
-      <div className="grid grid-cols-7 gap-1 hover:bg-gray-800">
-        <div>USD</div>
-        <div className="text-right">1,003,950</div>
-        <div className="text-right">1.00</div>
-        <div className="text-right">1.00</div>
-        <div className="text-right text-green-400">1,003,950</div>
-        <div className="text-right">100.0%</div>
-        <div className="text-right">0</div>
+const PortfolioWindow = ({ windowId, theme }: { windowId: string; theme?: any }) => {
+  const currentTheme = theme || TRADING_THEMES.classic;
+  return (
+    <div className={`h-full ${currentTheme.background} ${currentTheme.text} font-mono text-sm overflow-hidden`}>
+      <div className={`grid grid-cols-7 gap-1 p-2 border-b ${currentTheme.border} ${currentTheme.header}`}>
+        <div className="font-bold">Security</div>
+        <div className="font-bold text-right">Quantity</div>
+        <div className="font-bold text-right">Avg Price</div>
+        <div className="font-bold text-right">Last Price</div>
+        <div className="font-bold text-right">Value</div>
+        <div className="font-bold text-right">% Assets</div>
+        <div className="font-bold text-right">Gain</div>
       </div>
-      <div className="border-t border-green-400 pt-2 mt-2">
-        <div className="text-green-400 font-bold">Equity Value: 1,003,950</div>
+      <div className="p-2 space-y-1">
+        <div className="grid grid-cols-7 gap-1 hover:bg-gray-800">
+          <div>USD</div>
+          <div className="text-right">1,003,950</div>
+          <div className="text-right">1.00</div>
+          <div className="text-right">1.00</div>
+          <div className={`text-right ${currentTheme.positive}`}>1,003,950</div>
+          <div className="text-right">100.0%</div>
+          <div className="text-right">0</div>
+        </div>
+        <div className={`border-t ${currentTheme.border} pt-2 mt-2`}>
+          <div className={`${currentTheme.positive} font-bold`}>Equity Value: 1,003,950</div>
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
-const MarketWatchWindow = ({ windowId }: { windowId: string }) => (
-  <div className="h-full bg-black text-green-400 font-mono text-sm overflow-hidden">
-    <div className="grid grid-cols-6 gap-1 p-2 border-b border-green-400 bg-gray-900">
+const MarketWatchWindow = ({ windowId, theme }: { windowId: string; theme?: any }) => {
+  const currentTheme = theme || TRADING_THEMES.classic;
+  return (
+    <div className={`h-full ${currentTheme.background} ${currentTheme.text} font-mono text-sm overflow-hidden`}>
+      <div className={`grid grid-cols-6 gap-1 p-2 border-b ${currentTheme.border} ${currentTheme.header}`}>
       <div className="font-bold">Symbol</div>
       <div className="font-bold text-right">Last</div>
       <div className="font-bold text-right">Bid</div>
@@ -118,8 +175,9 @@ const MarketWatchWindow = ({ windowId }: { windowId: string }) => (
         <div className="text-right text-red-400">-0.5%</div>
       </div>
     </div>
-  </div>
-);
+    </div>
+  );
+};
 
 const BuyingPowerWindow = ({ windowId }: { windowId: string }) => (
   <div className="h-full bg-black text-green-400 font-mono text-sm p-4 overflow-hidden">
@@ -262,19 +320,166 @@ const OrderLogWindow = ({ windowId }: { windowId: string }) => (
   </div>
 );
 
+const MarketGraphWindow = ({ windowId }: { windowId: string }) => (
+  <div className="h-full bg-black text-green-400 font-mono text-sm overflow-hidden">
+    <div className="p-2 border-b border-green-400 bg-gray-900">
+      <div className="flex justify-between items-center">
+        <div className="font-bold">PNR - Real Time Chart</div>
+        <div className="text-xs">Last: $135.73</div>
+      </div>
+    </div>
+    <div className="relative h-full p-2">
+      {/* Simulated price chart using ASCII-style representation */}
+      <div className="h-full flex flex-col justify-end">
+        <div className="h-full relative">
+          {/* Chart grid */}
+          <div className="absolute inset-0 grid grid-cols-10 grid-rows-10 border-r border-b border-green-800">
+            {Array.from({ length: 100 }).map((_, i) => (
+              <div key={i} className="border-l border-t border-green-800 opacity-30"></div>
+            ))}
+          </div>
+          {/* Price line simulation */}
+          <svg className="absolute inset-0 w-full h-full">
+            <polyline
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              points="0,80 50,60 100,70 150,50 200,65 250,45 300,55 350,40 400,50"
+              className="text-green-400"
+            />
+          </svg>
+        </div>
+        <div className="text-xs text-gray-400 mt-2 grid grid-cols-5">
+          <div>9:30</div>
+          <div>10:00</div>
+          <div>10:30</div>
+          <div>11:00</div>
+          <div>11:30</div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const RiskManagementWindow = ({ windowId }: { windowId: string }) => (
+  <div className="h-full bg-red-900 text-white text-sm overflow-auto">
+    <div className="p-2 border-b border-red-400 bg-red-800 font-bold">
+      Risk Management Console
+    </div>
+    <div className="p-2 space-y-3">
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <div className="text-xs text-red-200">Max Position Size:</div>
+          <div className="text-lg font-bold">$100,000</div>
+        </div>
+        <div>
+          <div className="text-xs text-red-200">Current Exposure:</div>
+          <div className="text-lg font-bold text-green-400">$0</div>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <div className="text-xs text-red-200">VaR (95%):</div>
+          <div className="text-lg font-bold">$2,150</div>
+        </div>
+        <div>
+          <div className="text-xs text-red-200">Margin Used:</div>
+          <div className="text-lg font-bold">$0</div>
+        </div>
+      </div>
+      <div className="mt-4">
+        <div className="text-xs text-red-200 mb-1">Risk Metrics:</div>
+        <div className="text-xs space-y-1">
+          <div>Concentration Risk: <span className="text-green-400">LOW</span></div>
+          <div>Leverage Ratio: <span className="text-green-400">1.0x</span></div>
+          <div>Liquidity Risk: <span className="text-green-400">MINIMAL</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const AuctionWindow = ({ windowId }: { windowId: string }) => (
+  <div className="h-full bg-purple-900 text-purple-100 text-sm overflow-auto">
+    <div className="p-2 border-b border-purple-400 bg-purple-800 font-bold">
+      Market Making Auction
+    </div>
+    <div className="p-2 space-y-3">
+      <div className="text-center text-yellow-300 font-bold">
+        AUCTION: Market Making Rights for PNR
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <div className="text-xs text-purple-200">Current High Bid:</div>
+          <div className="text-lg font-bold text-yellow-300">$2,500</div>
+        </div>
+        <div>
+          <div className="text-xs text-purple-200">Time Remaining:</div>
+          <div className="text-lg font-bold text-red-300">45s</div>
+        </div>
+      </div>
+      <div className="space-y-2">
+        <div className="text-xs font-bold">Bid History:</div>
+        <div className="text-xs space-y-1 bg-purple-800 p-2 rounded">
+          <div>Trader_3: $2,500</div>
+          <div>Trader_1: $2,250</div>
+          <div>Trader_5: $2,000</div>
+        </div>
+      </div>
+      <div className="mt-4">
+        <input type="number" placeholder="Enter bid amount" className="w-full p-2 text-black rounded mb-2" />
+        <Button className="w-full bg-yellow-600 hover:bg-yellow-700 text-black font-bold">
+          PLACE BID
+        </Button>
+      </div>
+    </div>
+  </div>
+);
+
+const ThemeControlWindow = ({ windowId, onThemeChange }: { windowId: string; onThemeChange: (theme: string) => void }) => (
+  <div className="h-full bg-gray-800 text-white text-sm overflow-auto">
+    <div className="p-2 border-b border-gray-400 bg-gray-700 font-bold flex items-center gap-2">
+      <Palette size={16} />
+      Theme Settings
+    </div>
+    <div className="p-3 space-y-3">
+      <div className="text-xs font-bold mb-2">Color Themes:</div>
+      {Object.entries(TRADING_THEMES).map(([key, theme]) => (
+        <button
+          key={key}
+          onClick={() => onThemeChange(key)}
+          className="w-full p-2 text-left rounded hover:bg-gray-700 border border-gray-600"
+        >
+          <div className="font-medium">{theme.name}</div>
+          <div className="text-xs text-gray-400 mt-1">
+            <span className={`inline-block w-3 h-3 rounded mr-2 ${theme.background}`}></span>
+            <span className={`inline-block w-3 h-3 rounded mr-2 ${theme.text.replace('text-', 'bg-')}`}></span>
+            <span className={`inline-block w-3 h-3 rounded ${theme.accent.replace('text-', 'bg-')}`}></span>
+          </div>
+        </button>
+      ))}
+      <div className="mt-4 text-xs text-gray-400">
+        Themes optimize visibility for different lighting conditions and user preferences.
+      </div>
+    </div>
+  </div>
+);
+
 export default function ProfessionalTradingWorkspace({ 
   sessionId, 
   userId, 
   userRole 
 }: ProfessionalTradingWorkspaceProps) {
+  const [currentTheme, setCurrentTheme] = useState<keyof typeof TRADING_THEMES>('classic');
   const [windows, setWindows] = useState<TradingWindow[]>([
+    // Top row - 3 windows
     {
       id: 'portfolio',
       title: 'Portfolio',
       component: PortfolioWindow,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 10, y: 10, width: 400, height: 300, zIndex: 1 },
+      position: { x: 10, y: 10, width: 380, height: 250, zIndex: 1 },
       icon: DollarSign
     },
     {
@@ -283,17 +488,8 @@ export default function ProfessionalTradingWorkspace({
       component: BuyingPowerWindow,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 420, y: 10, width: 300, height: 400, zIndex: 1 },
+      position: { x: 400, y: 10, width: 320, height: 250, zIndex: 1 },
       icon: Activity
-    },
-    {
-      id: 'market-watch',
-      title: 'Market Watch',
-      component: MarketWatchWindow,
-      isMinimized: false,
-      isMaximized: false,
-      position: { x: 10, y: 320, width: 500, height: 250, zIndex: 1 },
-      icon: BarChart3
     },
     {
       id: 'news',
@@ -301,8 +497,19 @@ export default function ProfessionalTradingWorkspace({
       component: NewsWindow,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 730, y: 10, width: 450, height: 300, zIndex: 1 },
+      position: { x: 730, y: 10, width: 410, height: 250, zIndex: 1 },
       icon: FileText
+    },
+    
+    // Middle row - 3 windows  
+    {
+      id: 'market-watch',
+      title: 'Market Watch',
+      component: MarketWatchWindow,
+      isMinimized: false,
+      isMaximized: false,
+      position: { x: 10, y: 270, width: 380, height: 200, zIndex: 1 },
+      icon: BarChart3
     },
     {
       id: 'market-order',
@@ -310,17 +517,55 @@ export default function ProfessionalTradingWorkspace({
       component: MarketOrderWindow,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 520, y: 320, width: 350, height: 300, zIndex: 1 },
+      position: { x: 400, y: 270, width: 320, height: 200, zIndex: 1 },
       icon: TrendingUp
     },
+    {
+      id: 'market-graph',
+      title: 'Market Graph',
+      component: MarketGraphWindow,
+      isMinimized: false,
+      isMaximized: false,
+      position: { x: 730, y: 270, width: 410, height: 200, zIndex: 1 },
+      icon: LineChart
+    },
+    
+    // Bottom row - 4 windows
     {
       id: 'order-log',
       title: 'Order Log',
       component: OrderLogWindow,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 880, y: 320, width: 400, height: 250, zIndex: 1 },
+      position: { x: 10, y: 480, width: 270, height: 180, zIndex: 1 },
       icon: FileText
+    },
+    {
+      id: 'risk-management',
+      title: 'Risk Management',
+      component: RiskManagementWindow,
+      isMinimized: false,
+      isMaximized: false,
+      position: { x: 290, y: 480, width: 270, height: 180, zIndex: 1 },
+      icon: Shield
+    },
+    {
+      id: 'auction',
+      title: 'Market Making Auction',
+      component: AuctionWindow,
+      isMinimized: false,
+      isMaximized: false,
+      position: { x: 570, y: 480, width: 270, height: 180, zIndex: 1 },
+      icon: Zap
+    },
+    {
+      id: 'theme-control',
+      title: 'Theme Settings',
+      component: (props: any) => <ThemeControlWindow {...props} onThemeChange={setCurrentTheme} />,
+      isMinimized: false,
+      isMaximized: false,
+      position: { x: 850, y: 480, width: 290, height: 180, zIndex: 1 },
+      icon: Palette
     }
   ]);
 
@@ -358,8 +603,10 @@ export default function ProfessionalTradingWorkspace({
     setWindows(prev => prev.filter(window => window.id !== windowId));
   }, []);
 
+  const theme = TRADING_THEMES[currentTheme];
+  
   return (
-    <div className="h-screen w-screen bg-gray-800 relative overflow-hidden">
+    <div className={`h-screen w-screen ${theme.background} relative overflow-hidden`}>
       {/* Trading Windows */}
       {windows.map((window) => {
         const WindowComponent = window.component;
@@ -425,7 +672,7 @@ export default function ProfessionalTradingWorkspace({
 
             {/* Window Content */}
             <div className="h-full pb-8">
-              <WindowComponent windowId={window.id} {...window.props} />
+              <WindowComponent windowId={window.id} theme={theme} {...window.props} />
             </div>
           </div>
         );
