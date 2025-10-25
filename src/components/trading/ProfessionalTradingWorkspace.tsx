@@ -101,24 +101,18 @@ interface ProfessionalTradingWorkspaceProps {
 const PortfolioWindow = ({ windowId, theme }: { windowId: string; theme?: any }) => {
   const currentTheme = theme || TRADING_THEMES.classic;
   return (
-    <div className={`h-full ${currentTheme.background} ${currentTheme.text} font-mono text-sm overflow-hidden`}>
-      <div className={`grid grid-cols-7 gap-1 p-2 border-b ${currentTheme.border} ${currentTheme.header}`}>
+    <div className={`h-full ${currentTheme.background} ${currentTheme.text} font-mono text-xs overflow-hidden`}>
+      <div className={`grid grid-cols-4 gap-1 p-1 border-b ${currentTheme.border} ${currentTheme.header} text-xs`}>
         <div className="font-bold">Security</div>
-        <div className="font-bold text-right">Quantity</div>
-        <div className="font-bold text-right">Avg Price</div>
-        <div className="font-bold text-right">Last Price</div>
+        <div className="font-bold text-right">Qty</div>
         <div className="font-bold text-right">Value</div>
-        <div className="font-bold text-right">% Assets</div>
         <div className="font-bold text-right">Gain</div>
       </div>
-      <div className="p-2 space-y-1">
-        <div className="grid grid-cols-7 gap-1 hover:bg-gray-800">
+      <div className="p-1 space-y-1">
+        <div className="grid grid-cols-4 gap-1 hover:bg-gray-800">
           <div>USD</div>
           <div className="text-right">1,003,950</div>
-          <div className="text-right">1.00</div>
-          <div className="text-right">1.00</div>
           <div className={`text-right ${currentTheme.positive}`}>1,003,950</div>
-          <div className="text-right">100.0%</div>
           <div className="text-right">0</div>
         </div>
         <div className={`border-t ${currentTheme.border} pt-2 mt-2`}>
@@ -195,25 +189,27 @@ const MarketWatchWindow = ({ windowId, theme }: { windowId: string; theme?: any 
   };
 
   return (
-    <div className={`h-full ${currentTheme.background} ${currentTheme.text} font-mono text-sm overflow-hidden`}>
-      <div className={`grid grid-cols-6 gap-1 p-2 border-b ${currentTheme.border} ${currentTheme.header}`}>
+    <div className={`h-full ${currentTheme.background} ${currentTheme.text} font-mono text-xs overflow-hidden`}>
+      <div className={`grid grid-cols-5 gap-1 p-1 border-b ${currentTheme.border} ${currentTheme.header} text-xs`}>
         <div className="font-bold">Symbol</div>
         <div className="font-bold text-right">Last</div>
-        <div className="font-bold text-right">Bid</div>
-        <div className="font-bold text-right">Ask</div>
-        <div className="font-bold text-right">Volume</div>
-        <div className="font-bold text-right">Change</div>
+        <div className="font-bold text-right">Bid/Ask</div>
+        <div className="font-bold text-right">Vol</div>
+        <div className="font-bold text-right">Chg</div>
       </div>
-      <div className="p-2 space-y-1">
+      <div className="p-1 space-y-1">
         {Object.entries(marketData).map(([symbol, data]) => (
-          <div key={symbol} className="grid grid-cols-6 gap-1 hover:bg-gray-800 cursor-pointer p-1 rounded">
+          <div key={symbol} className="grid grid-cols-5 gap-1 hover:bg-gray-800 cursor-pointer p-1 rounded text-xs">
             <div className={currentTheme.accent}>{symbol}</div>
             <div className="text-right">{formatPrice(data.price, symbol)}</div>
-            <div className={`text-right ${currentTheme.positive}`}>{formatPrice(data.bid, symbol)}</div>
-            <div className={`text-right ${currentTheme.negative}`}>{formatPrice(data.ask, symbol)}</div>
+            <div className="text-right text-xs">
+              <span className={currentTheme.positive}>{formatPrice(data.bid, symbol)}</span>
+              <span className="text-gray-500">/</span>
+              <span className={currentTheme.negative}>{formatPrice(data.ask, symbol)}</span>
+            </div>
             <div className="text-right">{formatVolume(data.volume)}</div>
             <div className={`text-right text-xs ${getChangeColor(data.change)}`}>
-              {formatChange(data.change, data.changePercent)}
+              {data.changePercent >= 0 ? '+' : ''}{data.changePercent.toFixed(1)}%
             </div>
           </div>
         ))}
@@ -227,38 +223,40 @@ const MarketWatchWindow = ({ windowId, theme }: { windowId: string; theme?: any 
 };
 
 const BuyingPowerWindow = ({ windowId }: { windowId: string }) => (
-  <div className="h-full bg-black text-green-400 font-mono text-sm p-4 overflow-hidden">
-    <div className="space-y-3">
-      <div className="grid grid-cols-3 gap-4">
+  <div className="h-full bg-black text-green-400 font-mono text-xs p-2 overflow-hidden">
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 gap-2 text-xs">
         <div className="text-cyan-400">Initial</div>
-        <div className="text-right">Maintenance</div>
-        <div className="text-right">Minimum</div>
+        <div className="text-right text-white">1,003,950</div>
       </div>
-      <div className="grid grid-cols-3 gap-4 text-white">
-        <div>1,003,950</div>
-        <div className="text-right">1,003,950</div>
-        <div className="text-right">1,003,950</div>
+      <div className="grid grid-cols-2 gap-2 text-xs">
+        <div className="text-cyan-400">Maintenance</div>
+        <div className="text-right text-white">1,003,950</div>
       </div>
-      <div className="border-t border-green-400 pt-3">
-        <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-2 text-xs">
+        <div className="text-cyan-400">Available</div>
+        <div className="text-right text-white">1,003,950</div>
+      </div>
+      <div className="border-t border-green-400 pt-2 mt-2">
+        <div className="grid grid-cols-2 gap-2 text-xs">
           <div className="text-cyan-400">Actual</div>
           <div className="text-right text-white">0</div>
         </div>
-        <div className="grid grid-cols-2 gap-4 mt-2">
+        <div className="grid grid-cols-2 gap-2 mt-1 text-xs">
           <div className="text-cyan-400">Reserved</div>
           <div className="text-right text-white">0</div>
         </div>
-        <div className="grid grid-cols-2 gap-4 mt-2">
+        <div className="grid grid-cols-2 gap-2 mt-2 text-xs">
           <div className="text-cyan-400">Available (Stock)</div>
           <div className="text-right text-white">1,003,950</div>
         </div>
-        <div className="grid grid-cols-2 gap-4 mt-2">
+        <div className="grid grid-cols-2 gap-2 mt-2 text-xs">
           <div className="text-cyan-400">Buying Power</div>
           <div className="text-right text-white">2,007,900</div>
         </div>
       </div>
-      <div className="bg-green-600 text-black text-center py-2 mt-4 font-bold">
-        Account Status - Positive Buying Power
+      <div className="bg-green-600 text-black text-center py-1 mt-2 font-bold text-xs">
+        Account Status - Positive
       </div>
     </div>
   </div>
@@ -798,36 +796,45 @@ export default function ProfessionalTradingWorkspace({
 }: ProfessionalTradingWorkspaceProps) {
   const [currentTheme, setCurrentTheme] = useState<keyof typeof TRADING_THEMES>('classic');
   const [windows, setWindows] = useState<TradingWindow[]>([
-    // Row 1: Left side - Order Window (MOST IMPORTANT)
+    // Row 1: Order Window and Market Graph - MAIN TRADING TOOLS
     {
       id: 'market-order',
       title: 'Market Order Window',
       component: MarketOrderWindow,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 10, y: 10, width: 500, height: 350, zIndex: 1 },
+      position: { x: 10, y: 10, width: 420, height: 280, zIndex: 1 },
       icon: TrendingUp
     },
-    
-    // Row 1: Right side - Market Graph (SECOND MOST IMPORTANT)
     {
       id: 'market-graph',
       title: 'Market Graph',
       component: MarketGraphWindow,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 520, y: 10, width: 620, height: 350, zIndex: 1 },
+      position: { x: 440, y: 10, width: 500, height: 280, zIndex: 1 },
       icon: LineChart
     },
     
-    // Row 2: Four equal small windows
+    // Row 1 Right: News (tall to show more content)
+    {
+      id: 'news',
+      title: 'News',
+      component: NewsWindow,
+      isMinimized: false,
+      isMaximized: false,
+      position: { x: 950, y: 10, width: 380, height: 280, zIndex: 1 },
+      icon: FileText
+    },
+    
+    // Row 2: Support windows - wider layout
     {
       id: 'portfolio',
       title: 'Portfolio',
       component: PortfolioWindow,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 10, y: 370, width: 280, height: 160, zIndex: 1 },
+      position: { x: 10, y: 300, width: 320, height: 140, zIndex: 1 },
       icon: DollarSign
     },
     {
@@ -836,7 +843,7 @@ export default function ProfessionalTradingWorkspace({
       component: BuyingPowerWindow,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 300, y: 370, width: 280, height: 160, zIndex: 1 },
+      position: { x: 340, y: 300, width: 300, height: 140, zIndex: 1 },
       icon: Activity
     },
     {
@@ -845,36 +852,27 @@ export default function ProfessionalTradingWorkspace({
       component: MarketWatchWindow,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 590, y: 370, width: 280, height: 160, zIndex: 1 },
+      position: { x: 650, y: 300, width: 340, height: 140, zIndex: 1 },
       icon: BarChart3
     },
-    {
-      id: 'news',
-      title: 'News',
-      component: NewsWindow,
-      isMinimized: false,
-      isMaximized: false,
-      position: { x: 880, y: 370, width: 260, height: 160, zIndex: 1 },
-      icon: FileText
-    },
-    
-    // Row 3: Four small windows
     {
       id: 'order-log',
       title: 'Order Log',
       component: OrderLogWindow,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 10, y: 540, width: 280, height: 130, zIndex: 1 },
+      position: { x: 1000, y: 300, width: 330, height: 140, zIndex: 1 },
       icon: FileText
     },
+    
+    // Row 3: Bottom utility windows
     {
       id: 'risk-management',
       title: 'Risk Management',
       component: RiskManagementWindow,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 300, y: 540, width: 280, height: 130, zIndex: 1 },
+      position: { x: 10, y: 450, width: 320, height: 120, zIndex: 1 },
       icon: Shield
     },
     {
@@ -883,7 +881,7 @@ export default function ProfessionalTradingWorkspace({
       component: AuctionWindow,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 590, y: 540, width: 280, height: 130, zIndex: 1 },
+      position: { x: 340, y: 450, width: 320, height: 120, zIndex: 1 },
       icon: Zap
     },
     {
@@ -892,7 +890,7 @@ export default function ProfessionalTradingWorkspace({
       component: (props: any) => <ThemeControlWindow {...props} onThemeChange={setCurrentTheme} />,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 880, y: 540, width: 260, height: 130, zIndex: 1 },
+      position: { x: 670, y: 450, width: 320, height: 120, zIndex: 1 },
       icon: Palette
     }
   ]);
