@@ -4,7 +4,10 @@ services:
     env: node
     plan: starter
     buildCommand: npm ci && npm run build && npx prisma generate
-    startCommand: npm start
+    startCommand: ./scripts/start.sh
+    dependsOn:
+      - hypertick-db
+      - hypertick-redis
     envVars:
       - key: NODE_ENV
         value: production
@@ -32,6 +35,7 @@ services:
     plan: starter
     databaseName: hypertick
     databaseUser: hypertick_user
+    ipAllowList: []
 
   - type: redis
     name: hypertick-redis
