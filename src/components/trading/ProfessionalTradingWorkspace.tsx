@@ -101,8 +101,8 @@ interface ProfessionalTradingWorkspaceProps {
 const PortfolioWindow = ({ windowId, theme }: { windowId: string; theme?: any }) => {
   const currentTheme = theme || TRADING_THEMES.classic;
   return (
-    <div className={`h-full ${currentTheme.background} ${currentTheme.text} font-mono text-xs overflow-hidden`}>
-      <div className={`grid grid-cols-4 gap-1 p-1 border-b ${currentTheme.border} ${currentTheme.header} text-xs`}>
+    <div className={`h-full ${currentTheme.background} ${currentTheme.text} font-mono text-[9px] overflow-hidden`}>
+      <div className={`grid grid-cols-4 gap-1 p-1 border-b ${currentTheme.border} ${currentTheme.header} text-[9px]`}>
         <div className="font-bold">Security</div>
         <div className="font-bold text-right">Qty</div>
         <div className="font-bold text-right">Value</div>
@@ -115,7 +115,7 @@ const PortfolioWindow = ({ windowId, theme }: { windowId: string; theme?: any })
           <div className={`text-right ${currentTheme.positive}`}>1,003,950</div>
           <div className="text-right">0</div>
         </div>
-        <div className={`border-t ${currentTheme.border} pt-2 mt-2`}>
+        <div className={`border-t ${currentTheme.border} pt-2 mt-0.5`}>
           <div className={`${currentTheme.positive} font-bold`}>Equity Value: 1,003,950</div>
         </div>
       </div>
@@ -189,8 +189,8 @@ const MarketWatchWindow = ({ windowId, theme }: { windowId: string; theme?: any 
   };
 
   return (
-    <div className={`h-full ${currentTheme.background} ${currentTheme.text} font-mono text-xs overflow-hidden`}>
-      <div className={`grid grid-cols-5 gap-1 p-1 border-b ${currentTheme.border} ${currentTheme.header} text-xs`}>
+    <div className={`h-full ${currentTheme.background} ${currentTheme.text} font-mono text-[9px] overflow-hidden`}>
+      <div className={`grid grid-cols-5 gap-1 p-1 border-b ${currentTheme.border} ${currentTheme.header} text-[9px]`}>
         <div className="font-bold">Symbol</div>
         <div className="font-bold text-right">Last</div>
         <div className="font-bold text-right">Bid/Ask</div>
@@ -199,22 +199,22 @@ const MarketWatchWindow = ({ windowId, theme }: { windowId: string; theme?: any 
       </div>
       <div className="p-1 space-y-1">
         {Object.entries(marketData).map(([symbol, data]) => (
-          <div key={symbol} className="grid grid-cols-5 gap-1 hover:bg-gray-800 cursor-pointer p-1 rounded text-xs">
+          <div key={symbol} className="grid grid-cols-5 gap-1 hover:bg-gray-800 cursor-pointer p-1 rounded text-[9px]">
             <div className={currentTheme.accent}>{symbol}</div>
             <div className="text-right">{formatPrice(data.price, symbol)}</div>
-            <div className="text-right text-xs">
+            <div className="text-right text-[9px]">
               <span className={currentTheme.positive}>{formatPrice(data.bid, symbol)}</span>
               <span className="text-gray-500">/</span>
               <span className={currentTheme.negative}>{formatPrice(data.ask, symbol)}</span>
             </div>
             <div className="text-right">{formatVolume(data.volume)}</div>
-            <div className={`text-right text-xs ${getChangeColor(data.change)}`}>
+            <div className={`text-right text-[9px] ${getChangeColor(data.change)}`}>
               {data.changePercent >= 0 ? '+' : ''}{data.changePercent.toFixed(1)}%
             </div>
           </div>
         ))}
       </div>
-      <div className={`absolute bottom-2 right-2 text-xs ${currentTheme.text} opacity-60`}>
+      <div className={`absolute bottom-2 right-2 text-[9px] ${currentTheme.text} opacity-60`}>
         <Activity className="inline w-3 h-3 mr-1" />
         Live Market Data
       </div>
@@ -223,39 +223,39 @@ const MarketWatchWindow = ({ windowId, theme }: { windowId: string; theme?: any 
 };
 
 const BuyingPowerWindow = ({ windowId }: { windowId: string }) => (
-  <div className="h-full bg-black text-green-400 font-mono text-xs p-1 overflow-hidden">
+  <div className="h-full bg-black text-green-400 font-mono text-[9px] p-1 overflow-hidden">
     <div className="space-y-1">
-      <div className="grid grid-cols-2 gap-2 text-xs">
+      <div className="grid grid-cols-2 gap-2 text-[9px]">
         <div className="text-cyan-400">Initial</div>
         <div className="text-right text-white">1,003,950</div>
       </div>
-      <div className="grid grid-cols-2 gap-2 text-xs">
+      <div className="grid grid-cols-2 gap-2 text-[9px]">
         <div className="text-cyan-400">Maintenance</div>
         <div className="text-right text-white">1,003,950</div>
       </div>
-      <div className="grid grid-cols-2 gap-2 text-xs">
+      <div className="grid grid-cols-2 gap-2 text-[9px]">
         <div className="text-cyan-400">Available</div>
         <div className="text-right text-white">1,003,950</div>
       </div>
-      <div className="border-t border-green-400 pt-2 mt-2">
-        <div className="grid grid-cols-2 gap-2 text-xs">
+      <div className="border-t border-green-400 pt-2 mt-0.5">
+        <div className="grid grid-cols-2 gap-2 text-[9px]">
           <div className="text-cyan-400">Actual</div>
           <div className="text-right text-white">0</div>
         </div>
-        <div className="grid grid-cols-2 gap-2 mt-1 text-xs">
+        <div className="grid grid-cols-2 gap-2 mt-1 text-[9px]">
           <div className="text-cyan-400">Reserved</div>
           <div className="text-right text-white">0</div>
         </div>
-        <div className="grid grid-cols-2 gap-2 mt-2 text-xs">
+        <div className="grid grid-cols-2 gap-2 mt-0.5 text-[9px]">
           <div className="text-cyan-400">Available (Stock)</div>
           <div className="text-right text-white">1,003,950</div>
         </div>
-        <div className="grid grid-cols-2 gap-2 mt-2 text-xs">
+        <div className="grid grid-cols-2 gap-2 mt-0.5 text-[9px]">
           <div className="text-cyan-400">Buying Power</div>
           <div className="text-right text-white">2,007,900</div>
         </div>
       </div>
-      <div className="bg-green-600 text-black text-center py-1 mt-2 font-bold text-xs">
+      <div className="bg-green-600 text-black text-center py-1 mt-0.5 font-bold text-[9px]">
         Account Status - Positive
       </div>
     </div>
@@ -263,37 +263,37 @@ const BuyingPowerWindow = ({ windowId }: { windowId: string }) => (
 );
 
 const NewsWindow = ({ windowId }: { windowId: string }) => (
-  <div className="h-full bg-white text-black text-xs overflow-auto">
-    <div className="bg-blue-600 text-white p-1 font-bold text-center text-xs">
+  <div className="h-full bg-white text-black text-[9px] overflow-auto">
+    <div className="bg-blue-600 text-white p-1 font-bold text-center text-[9px]">
       News - Classroom Time: 9:31:51 AM - Simulation Date: 2/10/2000 - Length of Day: 6 seconds
     </div>
     <div className="p-2 space-y-1">
-      <div className="grid grid-cols-3 gap-2 text-xs font-bold border-b pb-1">
+      <div className="grid grid-cols-3 gap-2 text-[9px] font-bold border-b pb-1">
         <div>Date</div>
         <div>Ticker</div>
         <div>Headline</div>
       </div>
-      <div className="grid grid-cols-3 gap-2 text-xs hover:bg-gray-100 py-1">
+      <div className="grid grid-cols-3 gap-2 text-[9px] hover:bg-gray-100 py-1">
         <div>2/9/2000</div>
         <div className="text-blue-600">VGR</div>
         <div>Markets reverses EPS estimate for Q1 to 1.05 per share – from 0.9</div>
       </div>
-      <div className="grid grid-cols-3 gap-2 text-xs hover:bg-gray-100 py-1">
+      <div className="grid grid-cols-3 gap-2 text-[9px] hover:bg-gray-100 py-1">
         <div>2/6/2000</div>
         <div className="text-blue-600">PNR</div>
         <div>MacroBank estimates earnings of 0.45 per share for Q1</div>
       </div>
-      <div className="grid grid-cols-3 gap-2 text-xs hover:bg-gray-100 py-1">
+      <div className="grid grid-cols-3 gap-2 text-[9px] hover:bg-gray-100 py-1">
         <div>1/29/2000</div>
         <div className="text-blue-600">PNR</div>
         <div>FederalBank estimates earnings of 0.53 per share for Q1</div>
       </div>
-      <div className="grid grid-cols-3 gap-2 text-xs hover:bg-gray-100 py-1">
+      <div className="grid grid-cols-3 gap-2 text-[9px] hover:bg-gray-100 py-1">
         <div>1/23/2000</div>
         <div className="text-blue-600">PNR</div>
         <div>RYBank estimates earnings of 0.51 per share for Q1</div>
       </div>
-      <div className="grid grid-cols-3 gap-2 text-xs hover:bg-gray-100 py-1">
+      <div className="grid grid-cols-3 gap-2 text-[9px] hover:bg-gray-100 py-1">
         <div>1/23/2000</div>
         <div className="text-blue-600">PNR</div>
         <div>BostonBank estimates earnings of 0.43 per share for Q1</div>
@@ -344,13 +344,13 @@ const MarketOrderWindow = ({ windowId }: { windowId: string }) => {
 
   return (
     <div className="h-full bg-gray-200 p-2 overflow-hidden">
-      <div className="bg-blue-600 text-white text-center py-1 mb-1 font-bold text-xs">
+      <div className="bg-blue-600 text-white text-center py-1 mb-1 font-bold text-[9px]">
         Market Order Window: {symbol}
       </div>
       
       {/* Market Data Display */}
-      <div className="bg-black text-green-400 p-1 font-mono text-xs mb-1">
-        <div className="grid grid-cols-2 gap-4">
+      <div className="bg-black text-green-400 p-1 font-mono text-[9px] mb-1">
+        <div className="grid grid-cols-2 gap-1">
           <div>
             <div>Last: <span className="text-white">{currentData.last}</span></div>
             <div>Bid: <span className="text-white">{currentData.bid}</span></div>
@@ -367,12 +367,12 @@ const MarketOrderWindow = ({ windowId }: { windowId: string }) => {
       {/* Order Entry Form */}
       <div className="space-y-1">
         {/* Symbol Selection */}
-        <div className="grid grid-cols-2 gap-2 text-xs">
+        <div className="grid grid-cols-2 gap-2 text-[9px]">
           <label className="text-gray-700 font-semibold">Security:</label>
           <select 
             value={symbol} 
             onChange={(e) => setSymbol(e.target.value)}
-            className="px-1 py-1 border rounded text-xs"
+            className="px-1 py-1 border rounded text-[9px]"
           >
             <option value="PNR">PNR</option>
             <option value="AOE">AOE</option>
@@ -381,13 +381,13 @@ const MarketOrderWindow = ({ windowId }: { windowId: string }) => {
         </div>
 
         {/* Quantity */}
-        <div className="grid grid-cols-2 gap-2 text-xs">
+        <div className="grid grid-cols-2 gap-2 text-[9px]">
           <label className="text-gray-700 font-semibold">Quantity:</label>
           <input 
             type="number" 
             value={quantity}
             onChange={(e) => setQuantity(parseInt(e.target.value) || 0)}
-            className="px-1 py-1 border rounded text-xs"
+            className="px-1 py-1 border rounded text-[9px]"
             min="1"
           />
         </div>
@@ -396,7 +396,7 @@ const MarketOrderWindow = ({ windowId }: { windowId: string }) => {
         <div className="grid grid-cols-2 gap-1">
           <button 
             onClick={() => setOrderType('MARKET')}
-            className={`py-1 px-2 rounded text-xs ${
+            className={`py-1 px-2 rounded text-[9px] ${
               orderType === 'MARKET' 
                 ? 'bg-blue-600 text-white' 
                 : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
@@ -406,7 +406,7 @@ const MarketOrderWindow = ({ windowId }: { windowId: string }) => {
           </button>
           <button 
             onClick={() => setOrderType('LIMIT')}
-            className={`py-1 px-2 rounded text-xs ${
+            className={`py-1 px-2 rounded text-[9px] ${
               orderType === 'LIMIT' 
                 ? 'bg-blue-600 text-white' 
                 : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
@@ -418,13 +418,13 @@ const MarketOrderWindow = ({ windowId }: { windowId: string }) => {
 
         {/* Limit Price (only shown for limit orders) */}
         {orderType === 'LIMIT' && (
-          <div className="grid grid-cols-2 gap-2 text-xs">
+          <div className="grid grid-cols-2 gap-2 text-[9px]">
             <label className="text-gray-700 font-semibold">Price:</label>
             <input 
               type="number" 
               value={limitPrice}
               onChange={(e) => setLimitPrice(parseFloat(e.target.value) || 0)}
-              className="px-1 py-1 border rounded text-xs"
+              className="px-1 py-1 border rounded text-[9px]"
               step="0.01"
               min="0"
             />
@@ -435,13 +435,13 @@ const MarketOrderWindow = ({ windowId }: { windowId: string }) => {
         <div className="flex gap-1 mt-1">
           <button 
             onClick={handleBuyOrder}
-            className="flex-1 bg-green-600 hover:bg-green-700 text-white py-1 px-1 rounded text-xs font-bold"
+            className="flex-1 bg-green-600 hover:bg-green-700 text-white py-1 px-1 rounded text-[9px] font-bold"
           >
             BUY ${currentData.ask}
           </button>
           <button 
             onClick={handleSellOrder}
-            className="flex-1 bg-red-600 hover:bg-red-700 text-white py-1 px-1 rounded text-xs font-bold"
+            className="flex-1 bg-red-600 hover:bg-red-700 text-white py-1 px-1 rounded text-[9px] font-bold"
           >
             SELL ${currentData.bid}
           </button>
@@ -452,8 +452,8 @@ const MarketOrderWindow = ({ windowId }: { windowId: string }) => {
 };
 
 const OrderLogWindow = ({ windowId }: { windowId: string }) => (
-  <div className="h-full bg-white text-black text-sm overflow-auto">
-    <div className="grid grid-cols-8 gap-1 p-2 border-b border-gray-400 bg-gray-100 text-xs font-bold">
+  <div className="h-full bg-white text-black text-[9px] overflow-auto">
+    <div className="grid grid-cols-8 gap-1 p-2 border-b border-gray-400 bg-gray-100 text-[9px] font-bold">
       <div>Status</div>
       <div>Time</div>
       <div>ID</div>
@@ -537,14 +537,14 @@ const MarketGraphWindow = ({ windowId }: { windowId: string }) => {
   const symbols = ['AOE', 'SPX', 'BOND1', 'BOND2', 'BOND3'];
 
   return (
-    <div className="h-full bg-black text-green-400 font-mono text-sm overflow-hidden">
+    <div className="h-full bg-black text-green-400 font-mono text-[9px] overflow-hidden">
       <div className="p-2 border-b border-green-400 bg-gray-900">
         <div className="flex justify-between items-center">
           <div className="flex items-center space-x-4">
             <select 
               value={selectedSymbol}
               onChange={(e) => setSelectedSymbol(e.target.value)}
-              className="bg-gray-800 text-green-400 border border-green-400 rounded px-2 py-1 text-xs"
+              className="bg-gray-800 text-green-400 border border-green-400 rounded px-2 py-1 text-[9px]"
             >
               {symbols.map(symbol => (
                 <option key={symbol} value={symbol}>{symbol}</option>
@@ -552,7 +552,7 @@ const MarketGraphWindow = ({ windowId }: { windowId: string }) => {
             </select>
             <div className="font-bold">{selectedSymbol} - Real Time Chart</div>
           </div>
-          <div className="text-xs">
+          <div className="text-[9px]">
             <span>Last: ${formatPrice(currentPrice)}</span>
             <span className={`ml-2 ${priceChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
               {priceChange >= 0 ? '+' : ''}{formatPrice(priceChange)}
@@ -591,14 +591,14 @@ const MarketGraphWindow = ({ windowId }: { windowId: string }) => {
               )}
             </svg>
             {/* Price scale */}
-            <div className="absolute right-1 top-0 h-full flex flex-col justify-between text-xs text-gray-400">
+            <div className="absolute right-1 top-0 h-full flex flex-col justify-between text-[9px] text-gray-400">
               <div>{formatPrice(Math.max(...priceHistory))}</div>
               <div>{formatPrice((Math.max(...priceHistory) + Math.min(...priceHistory)) / 2)}</div>
               <div>{formatPrice(Math.min(...priceHistory))}</div>
             </div>
           </div>
           {/* Time axis */}
-          <div className="text-xs text-gray-400 mt-2 grid grid-cols-6 px-2">
+          <div className="text-[9px] text-gray-400 mt-0.5 grid grid-cols-6 px-2">
             <div>-50s</div>
             <div>-40s</div>
             <div>-30s</div>
@@ -608,7 +608,7 @@ const MarketGraphWindow = ({ windowId }: { windowId: string }) => {
           </div>
         </div>
         {/* Live indicator */}
-        <div className="absolute top-4 right-4 flex items-center text-xs">
+        <div className="absolute top-4 right-4 flex items-center text-[9px]">
           <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse mr-1"></div>
           Live
         </div>
@@ -618,34 +618,34 @@ const MarketGraphWindow = ({ windowId }: { windowId: string }) => {
 };
 
 const RiskManagementWindow = ({ windowId }: { windowId: string }) => (
-  <div className="h-full bg-red-900 text-white text-sm overflow-auto">
+  <div className="h-full bg-red-900 text-white text-[9px] overflow-auto">
     <div className="p-2 border-b border-red-400 bg-red-800 font-bold">
       Risk Management Console
     </div>
     <div className="p-2 space-y-3">
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-1">
         <div>
-          <div className="text-xs text-red-200">Max Position Size:</div>
-          <div className="text-lg font-bold">$100,000</div>
+          <div className="text-[9px] text-red-200">Max Position Size:</div>
+          <div className="text-[11px] font-bold">$100,000</div>
         </div>
         <div>
-          <div className="text-xs text-red-200">Current Exposure:</div>
-          <div className="text-lg font-bold text-green-400">$0</div>
+          <div className="text-[9px] text-red-200">Current Exposure:</div>
+          <div className="text-[11px] font-bold text-green-400">$0</div>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-1">
         <div>
-          <div className="text-xs text-red-200">VaR (95%):</div>
-          <div className="text-lg font-bold">$2,150</div>
+          <div className="text-[9px] text-red-200">VaR (95%):</div>
+          <div className="text-[11px] font-bold">$2,150</div>
         </div>
         <div>
-          <div className="text-xs text-red-200">Margin Used:</div>
-          <div className="text-lg font-bold">$0</div>
+          <div className="text-[9px] text-red-200">Margin Used:</div>
+          <div className="text-[11px] font-bold">$0</div>
         </div>
       </div>
       <div className="mt-4">
-        <div className="text-xs text-red-200 mb-1">Risk Metrics:</div>
-        <div className="text-xs space-y-1">
+        <div className="text-[9px] text-red-200 mb-1">Risk Metrics:</div>
+        <div className="text-[9px] space-y-1">
           <div>Concentration Risk: <span className="text-green-400">LOW</span></div>
           <div>Leverage Ratio: <span className="text-green-400">1.0x</span></div>
           <div>Liquidity Risk: <span className="text-green-400">MINIMAL</span></div>
@@ -744,13 +744,13 @@ const AuctionWindow = ({ windowId }: { windowId: string }) => {
 
   if (!selectedAuction) {
     return (
-      <div className="h-full bg-purple-900 text-purple-100 text-sm overflow-auto">
+      <div className="h-full bg-purple-900 text-purple-100 text-[9px] overflow-auto">
         <div className="p-2 border-b border-purple-400 bg-purple-800 font-bold">
           Market Making Auction
         </div>
         <div className="p-4 text-center">
-          <div className="text-purple-300 mb-4">No active auctions</div>
-          <div className="text-xs text-purple-400">
+          <div className="text-purple-300 mb-1">No active auctions</div>
+          <div className="text-[9px] text-purple-400">
             Auctions will appear here when market making rights become available
           </div>
         </div>
@@ -759,10 +759,10 @@ const AuctionWindow = ({ windowId }: { windowId: string }) => {
   }
 
   return (
-    <div className="h-full bg-purple-900 text-purple-100 text-sm overflow-auto">
+    <div className="h-full bg-purple-900 text-purple-100 text-[9px] overflow-auto">
       <div className="p-2 border-b border-purple-400 bg-purple-800 font-bold flex items-center justify-between">
         <span>Market Making Auction</span>
-        <div className={`px-2 py-1 rounded text-xs ${
+        <div className={`px-2 py-1 rounded text-[9px] ${
           selectedAuction.status === 'ACTIVE' ? 'bg-green-600' :
           selectedAuction.status === 'ENDED' ? 'bg-red-600' : 'bg-gray-600'
         }`}>
@@ -775,19 +775,19 @@ const AuctionWindow = ({ windowId }: { windowId: string }) => {
           AUCTION: {selectedAuction.description}
         </div>
         
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-1">
           <div>
-            <div className="text-xs text-purple-200">Current High Bid:</div>
-            <div className="text-lg font-bold text-yellow-300">
+            <div className="text-[9px] text-purple-200">Current High Bid:</div>
+            <div className="text-[11px] font-bold text-yellow-300">
               {formatBidAmount(selectedAuction.currentBid)}
             </div>
-            <div className="text-xs text-purple-300">
+            <div className="text-[9px] text-purple-300">
               by {selectedAuction.highestBidder}
             </div>
           </div>
           <div>
-            <div className="text-xs text-purple-200">Time Remaining:</div>
-            <div className={`text-lg font-bold ${
+            <div className="text-[9px] text-purple-200">Time Remaining:</div>
+            <div className={`text-[11px] font-bold ${
               timeRemaining <= 30 ? 'text-red-300 animate-pulse' : 'text-green-300'
             }`}>
               {timeRemaining > 0 ? formatTime(timeRemaining) : 'ENDED'}
@@ -795,7 +795,7 @@ const AuctionWindow = ({ windowId }: { windowId: string }) => {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 text-xs">
+        <div className="grid grid-cols-2 gap-1 text-[9px]">
           <div>
             <div className="text-purple-200">Minimum Bid:</div>
             <div className="font-bold">{formatBidAmount(selectedAuction.minimumBid)}</div>
@@ -806,11 +806,11 @@ const AuctionWindow = ({ windowId }: { windowId: string }) => {
           </div>
         </div>
 
-        <div className="space-y-2">
-          <div className="text-xs font-bold">Bid History:</div>
+        <div className="space-y-0.5">
+          <div className="text-[9px] font-bold">Bid History:</div>
           <div className="bg-purple-800 rounded p-2 max-h-32 overflow-y-auto">
             {bidHistory.length > 0 ? (
-              <div className="text-xs space-y-1">
+              <div className="text-[9px] space-y-1">
                 {bidHistory.map((bid, index) => (
                   <div key={index} className="flex justify-between items-center">
                     <span className={bid.bidder === 'You' ? 'text-yellow-300 font-bold' : ''}>
@@ -821,14 +821,14 @@ const AuctionWindow = ({ windowId }: { windowId: string }) => {
                 ))}
               </div>
             ) : (
-              <div className="text-xs text-purple-400">No bids yet</div>
+              <div className="text-[9px] text-purple-400">No bids yet</div>
             )}
           </div>
         </div>
 
         {selectedAuction.status === 'ACTIVE' && timeRemaining > 0 && (
-          <div className="mt-4 space-y-2">
-            <div className="text-xs text-purple-200">
+          <div className="mt-4 space-y-0.5">
+            <div className="text-[9px] text-purple-200">
               Minimum next bid: {formatBidAmount(selectedAuction.currentBid + 100)}
             </div>
             <input 
@@ -836,7 +836,7 @@ const AuctionWindow = ({ windowId }: { windowId: string }) => {
               placeholder={`Min: ${selectedAuction.currentBid + 100}`}
               value={bidAmount}
               onChange={(e) => setBidAmount(e.target.value)}
-              className="w-full p-2 text-black rounded text-sm"
+              className="w-full p-2 text-black rounded text-[9px]"
               min={selectedAuction.currentBid + 100}
             />
             <Button 
@@ -852,10 +852,10 @@ const AuctionWindow = ({ windowId }: { windowId: string }) => {
         {selectedAuction.status === 'ENDED' && (
           <div className="mt-4 p-3 bg-red-800 rounded text-center">
             <div className="text-yellow-300 font-bold">AUCTION ENDED</div>
-            <div className="text-sm mt-1">
+            <div className="text-[9px] mt-1">
               Winner: <span className="font-bold">{selectedAuction.highestBidder}</span>
             </div>
-            <div className="text-sm">
+            <div className="text-[9px]">
               Winning Bid: <span className="font-bold">{formatBidAmount(selectedAuction.currentBid)}</span>
             </div>
           </div>
@@ -866,13 +866,13 @@ const AuctionWindow = ({ windowId }: { windowId: string }) => {
 };
 
 const ThemeControlWindow = ({ windowId, onThemeChange }: { windowId: string; onThemeChange: (theme: string) => void }) => (
-  <div className="h-full bg-gray-800 text-white text-sm overflow-auto">
+  <div className="h-full bg-gray-800 text-white text-[9px] overflow-auto">
     <div className="p-2 border-b border-gray-400 bg-gray-700 font-bold flex items-center gap-2">
       <Palette size={16} />
       Theme Settings
     </div>
     <div className="p-3 space-y-3">
-      <div className="text-xs font-bold mb-2">Color Themes:</div>
+      <div className="text-[9px] font-bold mb-0.5">Color Themes:</div>
       {Object.entries(TRADING_THEMES).map(([key, theme]) => (
         <button
           key={key}
@@ -880,14 +880,14 @@ const ThemeControlWindow = ({ windowId, onThemeChange }: { windowId: string; onT
           className="w-full p-2 text-left rounded hover:bg-gray-700 border border-gray-600"
         >
           <div className="font-medium">{theme.name}</div>
-          <div className="text-xs text-gray-400 mt-1">
+          <div className="text-[9px] text-gray-400 mt-1">
             <span className={`inline-block w-3 h-3 rounded mr-2 ${theme.background}`}></span>
             <span className={`inline-block w-3 h-3 rounded mr-2 ${theme.text.replace('text-', 'bg-')}`}></span>
             <span className={`inline-block w-3 h-3 rounded ${theme.accent.replace('text-', 'bg-')}`}></span>
           </div>
         </button>
       ))}
-      <div className="mt-4 text-xs text-gray-400">
+      <div className="mt-4 text-[9px] text-gray-400">
         Themes optimize visibility for different lighting conditions and user preferences.
       </div>
     </div>
@@ -1063,12 +1063,12 @@ export default function ProfessionalTradingWorkspace({
           >
             {/* Window Title Bar */}
             <div 
-              className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-3 py-2 flex items-center justify-between cursor-move"
+              className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-1 py-0.5 flex items-center justify-between cursor-move"
               ref={el => { dragRefs.current[window.id] = el; }}
             >
               <div className="flex items-center gap-2">
                 {window.icon && <window.icon size={16} />}
-                <span className="font-semibold text-sm">{window.title}</span>
+                <span className="font-semibold text-[9px]">{window.title}</span>
               </div>
               <div className="flex items-center gap-1">
                 <button
@@ -1112,10 +1112,10 @@ export default function ProfessionalTradingWorkspace({
       {/* Taskbar */}
       <div className="absolute bottom-0 left-0 right-0 bg-gray-700 border-t-2 border-gray-600 h-12 flex items-center px-4">
         <div className="flex items-center gap-2">
-          <div className="bg-blue-600 text-white px-3 py-1 rounded text-sm font-semibold">
+          <div className="bg-blue-600 text-white px-1 py-1 rounded text-[9px] font-semibold">
             upTick Client v. 2.0
           </div>
-          <div className="text-white text-sm">
+          <div className="text-white text-[9px]">
             15:07
           </div>
         </div>
@@ -1125,7 +1125,7 @@ export default function ProfessionalTradingWorkspace({
             <button
               key={window.id}
               onClick={() => toggleMinimize(window.id)}
-              className="bg-gray-600 hover:bg-gray-500 text-white px-3 py-1 rounded text-sm flex items-center gap-1"
+              className="bg-gray-600 hover:bg-gray-500 text-white px-1 py-1 rounded text-[9px] flex items-center gap-1"
             >
               {window.icon && <window.icon size={14} />}
               {window.title}
