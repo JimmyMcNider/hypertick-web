@@ -20,8 +20,7 @@ import {
   TrendingUp,
   LineChart,
   Shield,
-  Zap,
-  Palette
+  Zap
 } from 'lucide-react';
 
 // Theme definitions
@@ -95,6 +94,7 @@ interface ProfessionalTradingWorkspaceProps {
   sessionId: string;
   userId: string;
   userRole: 'STUDENT' | 'INSTRUCTOR' | 'ADMIN';
+  initialTheme?: keyof typeof TRADING_THEMES;
 }
 
 // Professional Trading Window Components
@@ -865,41 +865,20 @@ const AuctionWindow = ({ windowId }: { windowId: string }) => {
   );
 };
 
-const ThemeControlWindow = ({ windowId, onThemeChange }: { windowId: string; onThemeChange: (theme: string) => void }) => (
-  <div className="h-full bg-gray-800 text-white text-[9px] overflow-auto">
-    <div className="p-2 border-b border-gray-400 bg-gray-700 font-bold flex items-center gap-2">
-      <Palette size={16} />
-      Theme Settings
-    </div>
-    <div className="p-3 space-y-3">
-      <div className="text-[9px] font-bold mb-0.5">Color Themes:</div>
-      {Object.entries(TRADING_THEMES).map(([key, theme]) => (
-        <button
-          key={key}
-          onClick={() => onThemeChange(key)}
-          className="w-full p-2 text-left rounded hover:bg-gray-700 border border-gray-600"
-        >
-          <div className="font-medium">{theme.name}</div>
-          <div className="text-[9px] text-gray-400 mt-1">
-            <span className={`inline-block w-3 h-3 rounded mr-2 ${theme.background}`}></span>
-            <span className={`inline-block w-3 h-3 rounded mr-2 ${theme.text.replace('text-', 'bg-')}`}></span>
-            <span className={`inline-block w-3 h-3 rounded ${theme.accent.replace('text-', 'bg-')}`}></span>
-          </div>
-        </button>
-      ))}
-      <div className="mt-4 text-[9px] text-gray-400">
-        Themes optimize visibility for different lighting conditions and user preferences.
-      </div>
-    </div>
-  </div>
-);
 
 export default function ProfessionalTradingWorkspace({ 
   sessionId, 
   userId, 
-  userRole 
+  userRole,
+  initialTheme = 'classic'
 }: ProfessionalTradingWorkspaceProps) {
-  const [currentTheme, setCurrentTheme] = useState<keyof typeof TRADING_THEMES>('classic');
+  const [currentTheme, setCurrentTheme] = useState<keyof typeof TRADING_THEMES>(initialTheme);
+  
+  // Sync with external theme changes
+  useEffect(() => {
+    setCurrentTheme(initialTheme);
+  }, [initialTheme]);
+  
   const [windows, setWindows] = useState<TradingWindow[]>([
     // Row 1: Order Window and Market Graph - MAIN TRADING TOOLS
     {
@@ -988,15 +967,6 @@ export default function ProfessionalTradingWorkspace({
       isMaximized: false,
       position: { x: 510, y: 665, width: 500, height: 200, zIndex: 1 },
       icon: Zap
-    },
-    {
-      id: 'theme-control',
-      title: 'Theme Settings',
-      component: (props: any) => <ThemeControlWindow {...props} onThemeChange={setCurrentTheme} />,
-      isMinimized: false,
-      isMaximized: false,
-      position: { x: 725, y: 495, width: 400, height: 150, zIndex: 1 },
-      icon: Palette
     }
   ]);
 

@@ -69,6 +69,7 @@ export default function TradingTerminal() {
   const [windows, setWindows] = useState<TradingWindow[]>([]);
   const [maxZIndex, setMaxZIndex] = useState(1000);
   const [loading, setLoading] = useState(true);
+  const [currentTheme, setCurrentTheme] = useState<'classic' | 'professional' | 'highContrast'>('classic');
   const [dragState, setDragState] = useState<{
     isDragging: boolean;
     windowId: string | null;
@@ -382,6 +383,21 @@ export default function TradingTerminal() {
         </div>
         <div className="flex items-center space-x-4">
           <span>{new Date().toLocaleTimeString()}</span>
+          
+          {/* Theme Selector */}
+          <div className="flex items-center space-x-2">
+            <span className="text-xs">THEME:</span>
+            <select
+              value={currentTheme}
+              onChange={(e) => setCurrentTheme(e.target.value as 'classic' | 'professional' | 'highContrast')}
+              className="bg-black text-orange-400 px-2 py-1 rounded text-xs border border-orange-600 hover:bg-gray-800"
+            >
+              <option value="classic">Classic Green</option>
+              <option value="professional">Professional Blue</option>
+              <option value="highContrast">High Contrast</option>
+            </select>
+          </div>
+          
           <button
             onClick={() => router.push('/dashboard')}
             className="bg-black text-orange-400 px-2 py-1 rounded text-xs hover:bg-gray-800"
@@ -397,6 +413,7 @@ export default function TradingTerminal() {
           sessionId={sessionState?.id || 'demo-session'}
           userId={user?.id || ''}
           userRole={user?.role || 'STUDENT'}
+          initialTheme={currentTheme}
         />
       </div>
     </div>
