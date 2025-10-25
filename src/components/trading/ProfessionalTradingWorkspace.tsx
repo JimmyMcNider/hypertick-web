@@ -72,10 +72,10 @@ export const TRADING_THEMES = {
 };
 
 interface WindowPosition {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+  x: number | string;
+  y: number | string;
+  width: number | string;
+  height: number | string;
   zIndex: number;
 }
 
@@ -887,7 +887,7 @@ export default function ProfessionalTradingWorkspace({
       component: MarketOrderWindow,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 5, y: 5, width: 550, height: 400, zIndex: 1 },
+      position: { x: 5, y: 5, width: '35vw', height: '45vh', zIndex: 1 },
       icon: TrendingUp
     },
     {
@@ -896,7 +896,7 @@ export default function ProfessionalTradingWorkspace({
       component: MarketGraphWindow,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 560, y: 5, width: 750, height: 400, zIndex: 1 },
+      position: { x: '36vw', y: 5, width: '42vw', height: '45vh', zIndex: 1 },
       icon: LineChart
     },
     
@@ -907,7 +907,7 @@ export default function ProfessionalTradingWorkspace({
       component: NewsWindow,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 1315, y: 5, width: 800, height: 400, zIndex: 1 },
+      position: { x: '79vw', y: 5, width: '20vw', height: '45vh', zIndex: 1 },
       icon: FileText
     },
     
@@ -918,7 +918,7 @@ export default function ProfessionalTradingWorkspace({
       component: PortfolioWindow,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 5, y: 410, width: 450, height: 250, zIndex: 1 },
+      position: { x: 5, y: '47vh', width: '22vw', height: '30vh', zIndex: 1 },
       icon: DollarSign
     },
     {
@@ -927,7 +927,7 @@ export default function ProfessionalTradingWorkspace({
       component: BuyingPowerWindow,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 460, y: 410, width: 400, height: 250, zIndex: 1 },
+      position: { x: '23vw', y: '47vh', width: '20vw', height: '30vh', zIndex: 1 },
       icon: Activity
     },
     {
@@ -936,7 +936,7 @@ export default function ProfessionalTradingWorkspace({
       component: MarketWatchWindow,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 865, y: 410, width: 550, height: 250, zIndex: 1 },
+      position: { x: '44vw', y: '47vh', width: '28vw', height: '30vh', zIndex: 1 },
       icon: BarChart3
     },
     {
@@ -945,7 +945,7 @@ export default function ProfessionalTradingWorkspace({
       component: OrderLogWindow,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 1420, y: 410, width: 695, height: 250, zIndex: 1 },
+      position: { x: '73vw', y: '47vh', width: '26vw', height: '30vh', zIndex: 1 },
       icon: FileText
     },
     
@@ -956,7 +956,7 @@ export default function ProfessionalTradingWorkspace({
       component: RiskManagementWindow,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 5, y: 665, width: 500, height: 200, zIndex: 1 },
+      position: { x: 5, y: '78vh', width: '32vw', height: '20vh', zIndex: 1 },
       icon: Shield
     },
     {
@@ -965,7 +965,7 @@ export default function ProfessionalTradingWorkspace({
       component: AuctionWindow,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 510, y: 665, width: 500, height: 200, zIndex: 1 },
+      position: { x: '33vw', y: '78vh', width: '32vw', height: '20vh', zIndex: 1 },
       icon: Zap
     }
   ]);
@@ -1007,7 +1007,7 @@ export default function ProfessionalTradingWorkspace({
   const theme = TRADING_THEMES[currentTheme];
   
   return (
-    <div className={`h-screen w-full ${theme.background} relative overflow-hidden`} style={{minWidth: '2200px'}}>
+    <div className={`h-screen w-full ${theme.background} relative overflow-hidden`}>
       {/* Trading Windows */}
       {windows.map((window) => {
         const WindowComponent = window.component;
