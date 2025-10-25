@@ -302,49 +302,154 @@ const NewsWindow = ({ windowId }: { windowId: string }) => (
   </div>
 );
 
-const MarketOrderWindow = ({ windowId }: { windowId: string }) => (
-  <div className="h-full bg-gray-200 p-4 overflow-hidden">
-    <div className="bg-blue-600 text-white text-center py-2 mb-4 font-bold">
-      Market Order Window: PNR
-    </div>
-    <div className="bg-black text-green-400 p-4 font-mono">
-      <div className="grid grid-cols-2 gap-8 mb-4">
-        <div>
-          <div>Last: <span className="text-white">135.73</span></div>
-          <div>Bid: <span className="text-white">155.30</span></div>
-          <div>Size: <span className="text-white">370</span></div>
-        </div>
-        <div>
-          <div>Volume: <span className="text-white">170,413</span></div>
-          <div>Ask: <span className="text-white">135.73</span></div>
-          <div>Size: <span className="text-white">272</span></div>
+const MarketOrderWindow = ({ windowId }: { windowId: string }) => {
+  const [symbol, setSymbol] = useState('PNR');
+  const [quantity, setQuantity] = useState(100);
+  const [orderType, setOrderType] = useState<'MARKET' | 'LIMIT'>('MARKET');
+  const [limitPrice, setLimitPrice] = useState(135.73);
+
+  const marketData = {
+    PNR: { last: 135.73, bid: 155.30, ask: 135.73, volume: 170413, bidSize: 370, askSize: 272 },
+    AOE: { last: 50.60, bid: 50.55, ask: 50.65, volume: 152000, bidSize: 200, askSize: 150 },
+    VGR: { last: 98.87, bid: 98.86, ask: 98.88, volume: 72000, bidSize: 100, askSize: 180 }
+  };
+
+  const currentData = marketData[symbol as keyof typeof marketData] || marketData.PNR;
+
+  const handleBuyOrder = () => {
+    const order = {
+      type: 'BUY',
+      symbol,
+      quantity,
+      orderType,
+      price: orderType === 'LIMIT' ? limitPrice : currentData.ask,
+      timestamp: new Date().toISOString()
+    };
+    console.log('Buy order:', order);
+    alert(`BUY ORDER PLACED: ${quantity} shares of ${symbol} ${orderType === 'MARKET' ? 'at market price' : `at $${limitPrice}`}`);
+  };
+
+  const handleSellOrder = () => {
+    const order = {
+      type: 'SELL', 
+      symbol,
+      quantity,
+      orderType,
+      price: orderType === 'LIMIT' ? limitPrice : currentData.bid,
+      timestamp: new Date().toISOString()
+    };
+    console.log('Sell order:', order);
+    alert(`SELL ORDER PLACED: ${quantity} shares of ${symbol} ${orderType === 'MARKET' ? 'at market price' : `at $${limitPrice}`}`);
+  };
+
+  return (
+    <div className="h-full bg-gray-200 p-2 overflow-hidden">
+      <div className="bg-blue-600 text-white text-center py-1 mb-2 font-bold text-xs">
+        Market Order Window: {symbol}
+      </div>
+      
+      {/* Market Data Display */}
+      <div className="bg-black text-green-400 p-2 font-mono text-xs mb-2">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <div>Last: <span className="text-white">{currentData.last}</span></div>
+            <div>Bid: <span className="text-white">{currentData.bid}</span></div>
+            <div>Size: <span className="text-white">{currentData.bidSize}</span></div>
+          </div>
+          <div>
+            <div>Volume: <span className="text-white">{currentData.volume.toLocaleString()}</span></div>
+            <div>Ask: <span className="text-white">{currentData.ask}</span></div>
+            <div>Size: <span className="text-white">{currentData.askSize}</span></div>
+          </div>
         </div>
       </div>
-    </div>
-    <div className="mt-4 space-y-3">
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="text-sm font-medium">Security:</label>
-          <select className="w-full border border-gray-400 p-1 text-sm">
-            <option>PNR</option>
+
+      {/* Order Entry Form */}
+      <div className="space-y-2">
+        {/* Symbol Selection */}
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <label className="text-gray-700 font-semibold">Security:</label>
+          <select 
+            value={symbol} 
+            onChange={(e) => setSymbol(e.target.value)}
+            className="px-1 py-1 border rounded text-xs"
+          >
+            <option value="PNR">PNR</option>
+            <option value="AOE">AOE</option>
+            <option value="VGR">VGR</option>
           </select>
         </div>
-        <div>
-          <label className="text-sm font-medium">Quantity:</label>
-          <input type="number" defaultValue="0" className="w-full border border-gray-400 p-1 text-sm" />
+
+        {/* Quantity */}
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <label className="text-gray-700 font-semibold">Quantity:</label>
+          <input 
+            type="number" 
+            value={quantity}
+            onChange={(e) => setQuantity(parseInt(e.target.value) || 0)}
+            className="px-1 py-1 border rounded text-xs"
+            min="1"
+          />
+        </div>
+
+        {/* Order Type */}
+        <div className="grid grid-cols-2 gap-1">
+          <button 
+            onClick={() => setOrderType('MARKET')}
+            className={`py-1 px-2 rounded text-xs ${
+              orderType === 'MARKET' 
+                ? 'bg-blue-600 text-white' 
+                : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+            }`}
+          >
+            MARKET
+          </button>
+          <button 
+            onClick={() => setOrderType('LIMIT')}
+            className={`py-1 px-2 rounded text-xs ${
+              orderType === 'LIMIT' 
+                ? 'bg-blue-600 text-white' 
+                : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+            }`}
+          >
+            LIMIT
+          </button>
+        </div>
+
+        {/* Limit Price (only shown for limit orders) */}
+        {orderType === 'LIMIT' && (
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <label className="text-gray-700 font-semibold">Price:</label>
+            <input 
+              type="number" 
+              value={limitPrice}
+              onChange={(e) => setLimitPrice(parseFloat(e.target.value) || 0)}
+              className="px-1 py-1 border rounded text-xs"
+              step="0.01"
+              min="0"
+            />
+          </div>
+        )}
+
+        {/* Buy/Sell Buttons */}
+        <div className="flex gap-2 mt-2">
+          <button 
+            onClick={handleBuyOrder}
+            className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 px-2 rounded text-xs font-bold"
+          >
+            BUY ${currentData.ask}
+          </button>
+          <button 
+            onClick={handleSellOrder}
+            className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 px-2 rounded text-xs font-bold"
+          >
+            SELL ${currentData.bid}
+          </button>
         </div>
       </div>
-      <div className="flex gap-4 justify-center">
-        <Button className="bg-green-600 hover:bg-green-700 text-white px-8 py-2">
-          Buy    $135.73
-        </Button>
-        <Button className="bg-red-600 hover:bg-red-700 text-white px-8 py-2">
-          Sell    $135.30
-        </Button>
-      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const OrderLogWindow = ({ windowId }: { windowId: string }) => (
   <div className="h-full bg-white text-black text-sm overflow-auto">
