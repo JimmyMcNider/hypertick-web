@@ -223,8 +223,8 @@ const MarketWatchWindow = ({ windowId, theme }: { windowId: string; theme?: any 
 };
 
 const BuyingPowerWindow = ({ windowId }: { windowId: string }) => (
-  <div className="h-full bg-black text-green-400 font-mono text-xs p-2 overflow-hidden">
-    <div className="space-y-2">
+  <div className="h-full bg-black text-green-400 font-mono text-xs p-1 overflow-hidden">
+    <div className="space-y-1">
       <div className="grid grid-cols-2 gap-2 text-xs">
         <div className="text-cyan-400">Initial</div>
         <div className="text-right text-white">1,003,950</div>
@@ -263,37 +263,37 @@ const BuyingPowerWindow = ({ windowId }: { windowId: string }) => (
 );
 
 const NewsWindow = ({ windowId }: { windowId: string }) => (
-  <div className="h-full bg-white text-black text-sm overflow-auto">
-    <div className="bg-blue-600 text-white p-2 font-bold text-center">
-      News    Classroom Time: 9:31:51 AM    Simulation Date: 2/10/2000    Length of Day: 6 seconds
+  <div className="h-full bg-white text-black text-xs overflow-auto">
+    <div className="bg-blue-600 text-white p-1 font-bold text-center text-xs">
+      News - Classroom Time: 9:31:51 AM - Simulation Date: 2/10/2000 - Length of Day: 6 seconds
     </div>
-    <div className="p-3 space-y-2">
-      <div className="grid grid-cols-4 gap-2 text-xs font-bold border-b pb-1">
+    <div className="p-2 space-y-1">
+      <div className="grid grid-cols-3 gap-2 text-xs font-bold border-b pb-1">
         <div>Date</div>
         <div>Ticker</div>
         <div>Headline</div>
       </div>
-      <div className="grid grid-cols-4 gap-2 text-xs hover:bg-gray-100 py-1">
+      <div className="grid grid-cols-3 gap-2 text-xs hover:bg-gray-100 py-1">
         <div>2/9/2000</div>
         <div className="text-blue-600">VGR</div>
         <div>Markets reverses EPS estimate for Q1 to 1.05 per share – from 0.9</div>
       </div>
-      <div className="grid grid-cols-4 gap-2 text-xs hover:bg-gray-100 py-1">
+      <div className="grid grid-cols-3 gap-2 text-xs hover:bg-gray-100 py-1">
         <div>2/6/2000</div>
         <div className="text-blue-600">PNR</div>
         <div>MacroBank estimates earnings of 0.45 per share for Q1</div>
       </div>
-      <div className="grid grid-cols-4 gap-2 text-xs hover:bg-gray-100 py-1">
+      <div className="grid grid-cols-3 gap-2 text-xs hover:bg-gray-100 py-1">
         <div>1/29/2000</div>
         <div className="text-blue-600">PNR</div>
         <div>FederalBank estimates earnings of 0.53 per share for Q1</div>
       </div>
-      <div className="grid grid-cols-4 gap-2 text-xs hover:bg-gray-100 py-1">
+      <div className="grid grid-cols-3 gap-2 text-xs hover:bg-gray-100 py-1">
         <div>1/23/2000</div>
         <div className="text-blue-600">PNR</div>
         <div>RYBank estimates earnings of 0.51 per share for Q1</div>
       </div>
-      <div className="grid grid-cols-4 gap-2 text-xs hover:bg-gray-100 py-1">
+      <div className="grid grid-cols-3 gap-2 text-xs hover:bg-gray-100 py-1">
         <div>1/23/2000</div>
         <div className="text-blue-600">PNR</div>
         <div>BostonBank estimates earnings of 0.43 per share for Q1</div>
@@ -344,12 +344,12 @@ const MarketOrderWindow = ({ windowId }: { windowId: string }) => {
 
   return (
     <div className="h-full bg-gray-200 p-2 overflow-hidden">
-      <div className="bg-blue-600 text-white text-center py-1 mb-2 font-bold text-xs">
+      <div className="bg-blue-600 text-white text-center py-1 mb-1 font-bold text-xs">
         Market Order Window: {symbol}
       </div>
       
       {/* Market Data Display */}
-      <div className="bg-black text-green-400 p-2 font-mono text-xs mb-2">
+      <div className="bg-black text-green-400 p-1 font-mono text-xs mb-1">
         <div className="grid grid-cols-2 gap-4">
           <div>
             <div>Last: <span className="text-white">{currentData.last}</span></div>
@@ -365,7 +365,7 @@ const MarketOrderWindow = ({ windowId }: { windowId: string }) => {
       </div>
 
       {/* Order Entry Form */}
-      <div className="space-y-2">
+      <div className="space-y-1">
         {/* Symbol Selection */}
         <div className="grid grid-cols-2 gap-2 text-xs">
           <label className="text-gray-700 font-semibold">Security:</label>
@@ -432,16 +432,16 @@ const MarketOrderWindow = ({ windowId }: { windowId: string }) => {
         )}
 
         {/* Buy/Sell Buttons */}
-        <div className="flex gap-2 mt-2">
+        <div className="flex gap-1 mt-1">
           <button 
             onClick={handleBuyOrder}
-            className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 px-2 rounded text-xs font-bold"
+            className="flex-1 bg-green-600 hover:bg-green-700 text-white py-1 px-1 rounded text-xs font-bold"
           >
             BUY ${currentData.ask}
           </button>
           <button 
             onClick={handleSellOrder}
-            className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 px-2 rounded text-xs font-bold"
+            className="flex-1 bg-red-600 hover:bg-red-700 text-white py-1 px-1 rounded text-xs font-bold"
           >
             SELL ${currentData.bid}
           </button>
@@ -908,7 +908,7 @@ export default function ProfessionalTradingWorkspace({
       component: MarketOrderWindow,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 10, y: 10, width: 420, height: 280, zIndex: 1 },
+      position: { x: 5, y: 5, width: 360, height: 220, zIndex: 1 },
       icon: TrendingUp
     },
     {
@@ -917,7 +917,7 @@ export default function ProfessionalTradingWorkspace({
       component: MarketGraphWindow,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 440, y: 10, width: 500, height: 280, zIndex: 1 },
+      position: { x: 370, y: 5, width: 480, height: 220, zIndex: 1 },
       icon: LineChart
     },
     
@@ -928,7 +928,7 @@ export default function ProfessionalTradingWorkspace({
       component: NewsWindow,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 950, y: 10, width: 380, height: 280, zIndex: 1 },
+      position: { x: 855, y: 5, width: 535, height: 220, zIndex: 1 },
       icon: FileText
     },
     
@@ -939,7 +939,7 @@ export default function ProfessionalTradingWorkspace({
       component: PortfolioWindow,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 10, y: 300, width: 320, height: 140, zIndex: 1 },
+      position: { x: 5, y: 230, width: 265, height: 110, zIndex: 1 },
       icon: DollarSign
     },
     {
@@ -948,7 +948,7 @@ export default function ProfessionalTradingWorkspace({
       component: BuyingPowerWindow,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 340, y: 300, width: 300, height: 140, zIndex: 1 },
+      position: { x: 275, y: 230, width: 220, height: 110, zIndex: 1 },
       icon: Activity
     },
     {
@@ -957,7 +957,7 @@ export default function ProfessionalTradingWorkspace({
       component: MarketWatchWindow,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 650, y: 300, width: 340, height: 140, zIndex: 1 },
+      position: { x: 500, y: 230, width: 350, height: 110, zIndex: 1 },
       icon: BarChart3
     },
     {
@@ -966,7 +966,7 @@ export default function ProfessionalTradingWorkspace({
       component: OrderLogWindow,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 1000, y: 300, width: 330, height: 140, zIndex: 1 },
+      position: { x: 855, y: 230, width: 535, height: 110, zIndex: 1 },
       icon: FileText
     },
     
@@ -977,7 +977,7 @@ export default function ProfessionalTradingWorkspace({
       component: RiskManagementWindow,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 10, y: 450, width: 320, height: 120, zIndex: 1 },
+      position: { x: 5, y: 345, width: 265, height: 95, zIndex: 1 },
       icon: Shield
     },
     {
@@ -986,7 +986,7 @@ export default function ProfessionalTradingWorkspace({
       component: AuctionWindow,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 340, y: 450, width: 320, height: 120, zIndex: 1 },
+      position: { x: 275, y: 345, width: 270, height: 95, zIndex: 1 },
       icon: Zap
     },
     {
@@ -995,7 +995,7 @@ export default function ProfessionalTradingWorkspace({
       component: (props: any) => <ThemeControlWindow {...props} onThemeChange={setCurrentTheme} />,
       isMinimized: false,
       isMaximized: false,
-      position: { x: 670, y: 450, width: 320, height: 120, zIndex: 1 },
+      position: { x: 550, y: 345, width: 300, height: 95, zIndex: 1 },
       icon: Palette
     }
   ]);
@@ -1037,7 +1037,7 @@ export default function ProfessionalTradingWorkspace({
   const theme = TRADING_THEMES[currentTheme];
   
   return (
-    <div className={`h-screen w-screen ${theme.background} relative overflow-hidden`}>
+    <div className={`h-screen w-full ${theme.background} relative overflow-hidden`} style={{minWidth: '1400px'}}>
       {/* Trading Windows */}
       {windows.map((window) => {
         const WindowComponent = window.component;
