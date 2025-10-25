@@ -1,27 +1,58 @@
 #!/bin/bash
 set -e
 
-echo "Starting HyperTick Web Application..."
+echo "🚀 Starting HyperTick Web Application..."
 
-# Wait for database to be ready
-echo "Waiting for database connection..."
-for i in {1..30}; do
-  if npx prisma db pull --schema=prisma/schema.prisma > /dev/null 2>&1; then
-    echo "Database connection established"
+# Check if DATABASE_URL is set
+if [ -z "$DATABASE_URL" ]; then
+    echo "❌ DATABASE_URL environment variable is not set"
+    exit 1
+fi
+
+echo "📡 Database URL configured: ${DATABASE_URL%%:*}://***"
+
+# Wait for database to be ready with better error handling
+echo "⏳ Waiting for database connection..."
+DB_READY=false
+
+for i in {1..60}; do
+  echo "🔍 Testing database connection (attempt $i/60)..."
+  
+  if npx prisma db pull --schema=prisma/schema.prisma --force > /dev/null 2>&1; then
+    echo "✅ Database connection established successfully"
+    DB_READY=true
     break
   fi
-  echo "Waiting for database... ($i/30)"
-  sleep 2
+  
+  echo "⚠️  Database not ready, waiting 3 seconds..."
+  sleep 3
 done
 
-# Initialize database
-echo "Initializing database..."
-npx prisma db push --accept-data-loss || echo "Database push failed, continuing..."
+if [ "$DB_READY" = false ]; then
+    echo "❌ Failed to connect to database after 180 seconds"
+    echo "🔧 Attempting to start application anyway (some features may be limited)"
+fi
 
-# Seed database
-echo "Seeding database..."
-npm run db:seed || echo "Database seeding failed, continuing..."
+# Initialize database schema
+if [ "$DB_READY" = true ]; then
+    echo "🗄️  Pushing database schema..."
+    if npx prisma db push --accept-data-loss; then
+        echo "✅ Database schema updated successfully"
+    else
+        echo "⚠️  Database schema push failed, but continuing..."
+    fi
+
+    # Seed database with initial data
+    echo "🌱 Seeding database with initial data..."
+    if npm run db:seed; then
+        echo "✅ Database seeded successfully"
+    else
+        echo "⚠️  Database seeding failed, but continuing..."
+    fi
+else
+    echo "⚠️  Skipping database operations due to connection issues"
+fi
 
 # Start the application
-echo "Starting application..."
-exec npm run start:next
+echo "🎯 Starting HyperTick application server..."
+exec npm run start
