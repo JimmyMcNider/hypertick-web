@@ -889,34 +889,6 @@ export default function ProfessionalTradingWorkspace({
   useEffect(() => {
     setCurrentTheme(initialTheme);
   }, [initialTheme]);
-
-  // Load saved layout on mount
-  useEffect(() => {
-    const saved = localStorage.getItem('hypertick-layout');
-    if (saved) {
-      try {
-        const layout = JSON.parse(saved);
-        setWindows(prev => prev.map(window => {
-          const savedWindow = layout.find((l: any) => l.id === window.id);
-          return savedWindow ? { ...window, position: savedWindow.position, isMinimized: savedWindow.isMinimized } : window;
-        }));
-      } catch (error) {
-        console.error('Failed to load saved layout:', error);
-      }
-    }
-  }, []);
-
-  // Listen for save layout events from navbar
-  useEffect(() => {
-    const handleSaveLayout = () => {
-      const layout = windows.map(({ id, position, isMinimized }) => ({ id, position, isMinimized }));
-      localStorage.setItem('hypertick-layout', JSON.stringify(layout));
-      alert('Layout saved successfully!');
-    };
-
-    window.addEventListener('saveLayout', handleSaveLayout);
-    return () => window.removeEventListener('saveLayout', handleSaveLayout);
-  }, [windows]);
   
   const [windows, setWindows] = useState<TradingWindow[]>([
     // Row 1: Order Window and Market Graph - MAIN TRADING TOOLS
@@ -1013,6 +985,34 @@ export default function ProfessionalTradingWorkspace({
   const [isResizing, setIsResizing] = useState<string | null>(null);
   const dragRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const resizeRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+
+  // Load saved layout on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('hypertick-layout');
+    if (saved) {
+      try {
+        const layout = JSON.parse(saved);
+        setWindows(prev => prev.map(window => {
+          const savedWindow = layout.find((l: any) => l.id === window.id);
+          return savedWindow ? { ...window, position: savedWindow.position, isMinimized: savedWindow.isMinimized } : window;
+        }));
+      } catch (error) {
+        console.error('Failed to load saved layout:', error);
+      }
+    }
+  }, []);
+
+  // Listen for save layout events from navbar
+  useEffect(() => {
+    const handleSaveLayout = () => {
+      const layout = windows.map(({ id, position, isMinimized }) => ({ id, position, isMinimized }));
+      localStorage.setItem('hypertick-layout', JSON.stringify(layout));
+      alert('Layout saved successfully!');
+    };
+
+    window.addEventListener('saveLayout', handleSaveLayout);
+    return () => window.removeEventListener('saveLayout', handleSaveLayout);
+  }, [windows]);
 
   const bringToFront = useCallback((windowId: string) => {
     setWindows(prev => prev.map(window => ({
