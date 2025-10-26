@@ -1,919 +1,329 @@
-/**
- * WebSocket Server for Real-time Communication
- * 
- * Handles real-time updates for trading, market data, session events,
- * and instructor controls. Maintains separate channels for different
- * types of data and user roles.
- */
-
+import { Server as SocketIOServer } from 'socket.io';
 import { Server as HTTPServer } from 'http';
-import { Server as SocketIOServer, Socket } from 'socket.io';
-import { enhancedSessionEngine, ActiveSession, SessionParticipant } from './enhanced-session-engine';
-import { authService } from './auth';
-import { prisma } from './db';
-import { tradingEngine } from './trading-engine';
-import { marketDataService } from './market-data-service';
-import { positionService } from './position-service';
-import { getRedisClient, setSession, getSession } from './redis';
+import { PrismaClient } from '@prisma/client';
 
-interface AuthenticatedSocket extends Socket {
+const prisma = new PrismaClient();
+
+// For use in Node.js
+export const initWebSocketServer = (server: HTTPServer) => {
+  return new TradingWebSocketServer(server);
+};
+
+export interface TradingMessage {
+  type: 'order' | 'trade' | 'market_update' | 'simulation_update' | 'price_update';
+  sessionId: string;
   userId?: string;
-  userRole?: 'STUDENT' | 'INSTRUCTOR' | 'ADMIN';
-  sessionId?: string;
-  classId?: string;
-}
-
-interface MarketDataUpdate {
-  securityId: string;
-  symbol: string;
-  bid?: number;
-  ask?: number;
-  last?: number;
-  volume: number;
+  data: any;
   timestamp: Date;
 }
 
-interface OrderUpdate {
-  orderId: string;
+export interface OrderData {
+  id: string;
   userId: string;
-  type: 'NEW' | 'FILLED' | 'CANCELLED' | 'REJECTED';
-  order: any;
-  execution?: any;
+  securityId: string;
+  symbol: string;
+  side: 'BUY' | 'SELL';
+  quantity: number;
+  price?: number;
+  type: 'MARKET' | 'LIMIT';
+  timeInForce: 'GTC' | 'IOC' | 'FOK';
 }
 
-interface PositionUpdate {
-  userId: string;
-  positions: any[];
-  equity: number;
-  pnl: number;
+export interface MarketData {
+  symbol: string;
+  lastPrice: number;
+  bid: number;
+  ask: number;
+  bidSize: number;
+  askSize: number;
+  volume: number;
+  tick: number;
 }
 
-interface SessionUpdate {
-  sessionId: string;
-  type: 'STATUS_CHANGE' | 'PARTICIPANT_JOIN' | 'PARTICIPANT_LEAVE' | 'MARKET_STATE' | 'TIME_UPDATE';
-  data: any;
-}
-
-interface AuctionUpdate {
-  auctionId: string;
-  type: 'CREATED' | 'STARTED' | 'BID_PLACED' | 'ROUND_COMPLETE' | 'COMPLETED';
-  data: any;
-}
-
-/**
- * WebSocket server class for real-time communication
- */
-export class WebSocketServer {
+export class TradingWebSocketServer {
   private io: SocketIOServer;
-  private connections: Map<string, AuthenticatedSocket> = new Map();
-  private sessionRooms: Map<string, Set<string>> = new Map(); // sessionId -> userIds
-  private classRooms: Map<string, Set<string>> = new Map(); // classId -> userIds
+  private activeSessions: Map<string, Set<string>> = new Map(); // sessionId -> userIds
+  private userSessions: Map<string, string> = new Map(); // userId -> sessionId
+  private marketData: Map<string, MarketData> = new Map(); // symbol -> marketData
 
-  constructor(httpServer: HTTPServer) {
-    this.io = new SocketIOServer(httpServer, {
+  constructor(server: HTTPServer) {
+    this.io = new SocketIOServer(server, {
       cors: {
-        origin: process.env.FRONTEND_URL || "http://localhost:3000",
-        methods: ["GET", "POST"],
-        credentials: true
-      },
-      transports: ['websocket', 'polling']
+        origin: process.env.NODE_ENV === 'production' 
+          ? ['https://hypertick-web.onrender.com'] 
+          : ['http://localhost:3000'],
+        methods: ['GET', 'POST']
+      }
     });
 
     this.setupEventHandlers();
-    this.setupSessionEngineListeners();
-    this.setupTradingEngineListeners();
-    this.setupMarketDataListeners();
-    this.setupPositionServiceListeners();
+    this.initializeMarketData();
   }
 
-  /**
-   * Setup main socket event handlers
-   */
-  private setupEventHandlers(): void {
-    this.io.on('connection', (socket: AuthenticatedSocket) => {
-      console.log(`Socket connected: ${socket.id}`);
+  private setupEventHandlers() {
+    this.io.on('connection', (socket) => {
+      console.log('Client connected:', socket.id);
 
-      // Authentication middleware
-      socket.on('authenticate', async (data: { token: string }) => {
+      socket.on('join_session', async (data: { sessionId: string; userId: string; role: 'Student' | 'Instructor' }) => {
         try {
-          const authUser = await authService.verifyToken(data.token);
-          const userId = authUser.id;
-          if (!userId) throw new Error('Invalid token');
-
-          const user = await prisma.user.findUnique({
-            where: { id: userId },
-            select: { id: true, username: true, firstName: true, lastName: true, role: true }
-          });
-
-          if (!user) throw new Error('User not found');
-
-          socket.userId = user.id;
-          socket.userRole = user.role;
+          // Verify session exists and user has access
+          const sessionUser = await this.verifySessionAccess(data.sessionId, data.userId, data.role);
           
-          this.connections.set(socket.id, socket);
-          
-          socket.emit('authenticated', { 
-            userId: user.id, 
-            role: user.role,
-            username: user.username,
-            fullName: `${user.firstName} ${user.lastName}`
-          });
-          
-          console.log(`User authenticated: ${user.username} (${user.role})`);
+          if (sessionUser) {
+            socket.join(`session_${data.sessionId}`);
+            socket.join(`user_${data.userId}`);
+            
+            // Track active users in session
+            if (!this.activeSessions.has(data.sessionId)) {
+              this.activeSessions.set(data.sessionId, new Set());
+            }
+            this.activeSessions.get(data.sessionId)!.add(data.userId);
+            this.userSessions.set(data.userId, data.sessionId);
+
+            // Send current market data to newly connected user
+            const marketSnapshot = Array.from(this.marketData.values());
+            socket.emit('market_snapshot', marketSnapshot);
+
+            // Notify session of new participant
+            socket.to(`session_${data.sessionId}`).emit('user_joined', {
+              userId: data.userId,
+              role: data.role,
+              timestamp: new Date()
+            });
+
+            console.log(`User ${data.userId} joined session ${data.sessionId}`);
+          } else {
+            socket.emit('error', { message: 'Access denied to simulation session' });
+          }
         } catch (error) {
-          socket.emit('auth_error', { error: 'Invalid token' });
-          socket.disconnect();
+          console.error('Error joining session:', error);
+          socket.emit('error', { message: 'Failed to join session' });
         }
       });
 
-      // Join session room
-      socket.on('join_session', async (data: { sessionId: string }) => {
-        if (!socket.userId) {
-          socket.emit('error', { error: 'Not authenticated' });
-          return;
-        }
-
+      socket.on('submit_order', async (orderData: OrderData) => {
         try {
-          // Verify user has access to this session
-          const sessionUser = await prisma.sessionUser.findUnique({
-            where: {
-              sessionId_userId: {
-                sessionId: data.sessionId,
-                userId: socket.userId
-              }
-            },
-            include: {
-              session: true,
-              user: true
-            }
-          });
-
-          if (!sessionUser && socket.userRole !== 'INSTRUCTOR' && socket.userRole !== 'ADMIN') {
-            socket.emit('error', { error: 'Access denied to session' });
+          const sessionId = this.userSessions.get(orderData.userId);
+          if (!sessionId) {
+            socket.emit('error', { message: 'Not connected to any session' });
             return;
           }
 
-          socket.sessionId = data.sessionId;
-          socket.classId = sessionUser?.session.classId;
-          
-          // Join room
-          socket.join(`session:${data.sessionId}`);
-          
-          // Track in session room
-          if (!this.sessionRooms.has(data.sessionId)) {
-            this.sessionRooms.set(data.sessionId, new Set());
-          }
-          this.sessionRooms.get(data.sessionId)!.add(socket.userId);
-
-          // Add participant to enhanced session engine
-          if (socket.userId && socket.userRole) {
-            // Fetch user data for username
-            const userData = await prisma.user.findUnique({
-              where: { id: socket.userId },
-              select: { username: true }
-            });
-            
-            const participant: SessionParticipant = {
-              id: socket.userId,
-              username: userData?.username || 'Unknown',
-              role: socket.userRole,
-              privileges: new Set([1, 8, 9, 13, 15]), // Default privileges
-              socketId: socket.id,
-              isConnected: true,
-              lastActivity: new Date(),
-              performance: {
-                totalPnL: 0,
-                tradesExecuted: 0,
-                averageSpread: 0,
-                riskScore: 0
-              }
-            };
-
-            enhancedSessionEngine.addParticipant(data.sessionId, participant);
-          }
-
-          // Send current session state
-          const sessionState = enhancedSessionEngine.getSession(data.sessionId);
-          if (sessionState) {
-            socket.emit('session_state', sessionState);
-          }
-
-          // Notify others of participant join
-          socket.to(`session:${data.sessionId}`).emit('participant_joined', {
-            userId: socket.userId,
-            username: sessionUser?.user.username || 'Unknown'
-          });
-
-          console.log(`User ${socket.userId} joined session ${data.sessionId}`);
-        } catch (error) {
-          socket.emit('error', { error: 'Failed to join session' });
-        }
-      });
-
-      // Leave session room
-      socket.on('leave_session', () => {
-        if (socket.sessionId && socket.userId) {
-          socket.leave(`session:${socket.sessionId}`);
-          
-          // Remove from enhanced session engine
-          enhancedSessionEngine.removeParticipant(socket.sessionId, socket.userId);
-          
-          const sessionRoom = this.sessionRooms.get(socket.sessionId);
-          if (sessionRoom) {
-            sessionRoom.delete(socket.userId);
-            if (sessionRoom.size === 0) {
-              this.sessionRooms.delete(socket.sessionId);
-            }
-          }
-
-          socket.to(`session:${socket.sessionId}`).emit('participant_left', {
-            userId: socket.userId
-          });
-
-          socket.sessionId = undefined;
-          socket.classId = undefined;
-        }
-      });
-
-      // Order management
-      socket.on('place_order', async (orderData: any) => {
-        if (!socket.userId || !socket.sessionId) {
-          socket.emit('error', { error: 'Not authenticated or in session' });
-          return;
-        }
-
-        try {
-          // Process order through trading engine
-          const result = await tradingEngine.placeOrder(socket.sessionId, socket.userId, orderData);
+          // Process order through matching engine
+          const result = await this.processOrder(sessionId, orderData);
           
           if (result.success) {
-            socket.emit('order_response', { success: true, orderId: result.orderId });
+            // Broadcast order and any resulting trades to all session participants
+            this.io.to(`session_${sessionId}`).emit('order_update', {
+              order: result.order,
+              trades: result.trades,
+              marketUpdate: result.marketUpdate,
+              timestamp: new Date()
+            });
+
+            // Update market data if trades occurred
+            if (result.trades && result.trades.length > 0) {
+              this.updateMarketData(orderData.symbol, result.trades);
+            }
           } else {
-            socket.emit('order_error', { error: result.error });
-          }
-
-        } catch (error) {
-          socket.emit('order_error', { error: 'Order processing failed' });
-        }
-      });
-
-      // Cancel order
-      socket.on('cancel_order', async (data: { orderId: string }) => {
-        if (!socket.userId || !socket.sessionId) {
-          socket.emit('error', { error: 'Not authenticated or in session' });
-          return;
-        }
-
-        try {
-          const result = await tradingEngine.cancelOrder(data.orderId);
-          socket.emit('cancel_response', result);
-        } catch (error) {
-          socket.emit('error', { error: 'Cancel order failed' });
-        }
-      });
-
-      // Get portfolio
-      socket.on('get_portfolio', (data: any) => {
-        if (!socket.userId) {
-          socket.emit('error', { error: 'Not authenticated' });
-          return;
-        }
-
-        try {
-          const portfolio = positionService.getPortfolio(socket.userId);
-          const positions = positionService.getPositions(socket.userId);
-          socket.emit('portfolio_update', { portfolio, positions });
-        } catch (error) {
-          socket.emit('error', { error: 'Portfolio retrieval failed' });
-        }
-      });
-
-      // Get risk metrics
-      socket.on('get_risk_metrics', (data: any) => {
-        if (!socket.userId) {
-          socket.emit('error', { error: 'Not authenticated' });
-          return;
-        }
-
-        try {
-          // Risk metrics will be calculated and sent via position service events
-          const portfolio = positionService.getPortfolio(socket.userId);
-          socket.emit('risk_metrics_response', { portfolio });
-        } catch (error) {
-          socket.emit('error', { error: 'Risk metrics retrieval failed' });
-        }
-      });
-
-      // Get market data
-      socket.on('get_market_data', (data: { symbol: string }) => {
-        const marketData = tradingEngine.getMarketData(data.symbol);
-        const orderBook = tradingEngine.getOrderBook(data.symbol);
-        
-        socket.emit('market_data_response', {
-          symbol: data.symbol,
-          marketData,
-          orderBook
-        });
-      });
-
-      // Auction bidding
-      socket.on('place_bid', async (bidData: { auctionId: string; amount: number }) => {
-        if (!socket.userId || !socket.sessionId) {
-          socket.emit('error', { error: 'Not authenticated or in session' });
-          return;
-        }
-
-        try {
-          // Process bid (will implement auction engine later)
-          await this.processBid(socket.sessionId, socket.userId, bidData);
-          
-        } catch (error) {
-          socket.emit('bid_error', { error: error instanceof Error ? error.message : String(error) });
-        }
-      });
-
-      // Instructor controls
-      socket.on('instructor_command', async (commandData: any) => {
-        if (socket.userRole !== 'INSTRUCTOR' && socket.userRole !== 'ADMIN') {
-          socket.emit('error', { error: 'Insufficient permissions' });
-          return;
-        }
-
-        if (!socket.sessionId) {
-          socket.emit('error', { error: 'Not in session' });
-          return;
-        }
-
-        try {
-          await this.processInstructorCommand(socket.sessionId, commandData);
-          socket.emit('command_response', { success: true, command: commandData.command });
-        } catch (error) {
-          socket.emit('command_error', { error: 'Command execution failed' });
-        }
-      });
-
-      // News injection
-      socket.on('inject_news', (newsData: { symbol?: string; title: string; content: string; impact: 'POSITIVE' | 'NEGATIVE' | 'NEUTRAL'; severity: 'LOW' | 'MEDIUM' | 'HIGH'; duration: number }) => {
-        if (socket.userRole !== 'INSTRUCTOR' && socket.userRole !== 'ADMIN') {
-          socket.emit('error', { error: 'Insufficient permissions' });
-          return;
-        }
-
-        if (!socket.sessionId) {
-          socket.emit('error', { error: 'Not in session' });
-          return;
-        }
-
-        try {
-          marketDataService.injectNewsEvent(socket.sessionId, newsData);
-          socket.emit('news_injected', { success: true });
-        } catch (error) {
-          socket.emit('error', { error: 'Failed to inject news' });
-        }
-      });
-
-      // Price shock
-      socket.on('create_price_shock', (shockData: { symbol: string; magnitude: number; direction: 'UP' | 'DOWN' }) => {
-        if (socket.userRole !== 'INSTRUCTOR' && socket.userRole !== 'ADMIN') {
-          socket.emit('error', { error: 'Insufficient permissions' });
-          return;
-        }
-
-        if (!socket.sessionId) {
-          socket.emit('error', { error: 'Not in session' });
-          return;
-        }
-
-        try {
-          marketDataService.createPriceShock(socket.sessionId, shockData.symbol, shockData.magnitude, shockData.direction);
-          socket.emit('price_shock_created', { success: true });
-        } catch (error) {
-          socket.emit('error', { error: 'Failed to create price shock' });
-        }
-      });
-
-      // Market summary request
-      socket.on('get_market_summary', () => {
-        if (!socket.sessionId) {
-          socket.emit('error', { error: 'Not in session' });
-          return;
-        }
-
-        try {
-          const summary = marketDataService.getMarketSummary(socket.sessionId);
-          socket.emit('market_summary', summary);
-        } catch (error) {
-          socket.emit('error', { error: 'Failed to get market summary' });
-        }
-      });
-
-      // Start market simulation
-      socket.on('start_market', async (data: { symbols?: string[] }) => {
-        if (socket.userRole !== 'INSTRUCTOR' && socket.userRole !== 'ADMIN') {
-          socket.emit('error', { error: 'Insufficient permissions' });
-          return;
-        }
-
-        if (!socket.sessionId) {
-          socket.emit('error', { error: 'Not in session' });
-          return;
-        }
-
-        try {
-          const symbols = data.symbols || ['AOE', 'BOND1', 'BOND2'];
-          tradingEngine.startMarketSimulation(socket.sessionId, symbols);
-          marketDataService.startDataFeed(socket.sessionId, symbols);
-          socket.emit('market_start_response', { success: true, symbols });
-        } catch (error) {
-          socket.emit('error', { error: 'Failed to start market' });
-        }
-      });
-
-      // Stop market simulation
-      socket.on('stop_market', async () => {
-        if (socket.userRole !== 'INSTRUCTOR' && socket.userRole !== 'ADMIN') {
-          socket.emit('error', { error: 'Insufficient permissions' });
-          return;
-        }
-
-        if (!socket.sessionId) {
-          socket.emit('error', { error: 'Not in session' });
-          return;
-        }
-
-        try {
-          tradingEngine.stopMarketSimulation(socket.sessionId);
-          marketDataService.stopDataFeed(socket.sessionId);
-          socket.emit('market_stop_response', { success: true });
-        } catch (error) {
-          socket.emit('error', { error: 'Failed to stop market' });
-        }
-      });
-
-      // Handle disconnection
-      socket.on('disconnect', () => {
-        console.log(`Socket disconnected: ${socket.id}`);
-        
-        // Clean up rooms
-        if (socket.sessionId) {
-          const sessionRoom = this.sessionRooms.get(socket.sessionId);
-          if (sessionRoom && socket.userId) {
-            sessionRoom.delete(socket.userId);
-            
-            socket.to(`session:${socket.sessionId}`).emit('participant_left', {
-              userId: socket.userId
+            socket.emit('order_rejected', {
+              orderId: orderData.id,
+              reason: result.reason,
+              timestamp: new Date()
             });
           }
-        }
-
-        this.connections.delete(socket.id);
-      });
-    });
-  }
-
-  /**
-   * Setup listeners for enhanced session engine events
-   */
-  private setupSessionEngineListeners(): void {
-    enhancedSessionEngine.on('session_started', (data: { sessionId: string; session: ActiveSession }) => {
-      this.broadcastToSession(data.sessionId, 'session_started', {
-        sessionId: data.sessionId,
-        status: data.session.status,
-        startTime: data.session.startTime,
-        lesson: {
-          title: data.session.currentLesson.name,
-          scenario: data.session.scenario
+        } catch (error) {
+          console.error('Error processing order:', error);
+          socket.emit('error', { message: 'Failed to process order' });
         }
       });
-    });
 
-    enhancedSessionEngine.on('session_completed', (data: { sessionId: string; session: ActiveSession }) => {
-      this.broadcastToSession(data.sessionId, 'session_ended', {
-        sessionId: data.sessionId,
-        status: data.session.status,
-        endTime: data.session.endTime,
-        duration: data.session.endTime ? 
-          data.session.endTime.getTime() - data.session.startTime.getTime() : 0
-      });
-    });
-
-    enhancedSessionEngine.on('session_paused', (data: { sessionId: string }) => {
-      this.broadcastToSession(data.sessionId, 'session_paused', {
-        sessionId: data.sessionId,
-        timestamp: new Date()
-      });
-    });
-
-    enhancedSessionEngine.on('session_resumed', (data: { sessionId: string }) => {
-      this.broadcastToSession(data.sessionId, 'session_resumed', {
-        sessionId: data.sessionId,
-        timestamp: new Date()
-      });
-    });
-
-    enhancedSessionEngine.on('command_executed', (data: { sessionId: string; command: any; session: ActiveSession }) => {
-      this.broadcastToSession(data.sessionId, 'command_executed', {
-        command: data.command,
-        timestamp: new Date(),
-        executedCommands: data.session.executedCommands.size,
-        pendingCommands: data.session.pendingCommands.length
-      });
-    });
-
-    enhancedSessionEngine.on('market_opened', (data: { sessionId: string; symbols?: string[] }) => {
-      this.broadcastToSession(data.sessionId, 'market_opened', {
-        symbols: data.symbols,
-        timestamp: new Date()
-      });
-    });
-
-    enhancedSessionEngine.on('market_closed', (data: { sessionId: string; symbols?: string[] }) => {
-      this.broadcastToSession(data.sessionId, 'market_closed', {
-        symbols: data.symbols,
-        timestamp: new Date()
-      });
-    });
-
-    enhancedSessionEngine.on('auction_started', (data: any) => {
-      this.broadcastToSession(data.sessionId, 'auction_started', {
-        auctionId: data.auctionId,
-        symbol: data.symbol,
-        endTime: data.endTime,
-        minimumBid: data.minimumBid,
-        timestamp: new Date()
-      });
-    });
-
-    enhancedSessionEngine.on('auction_ended', (data: any) => {
-      this.broadcastToSession(data.sessionId, 'auction_ended', {
-        auctionId: data.auctionId,
-        winner: data.winner,
-        winningBid: data.winningBid,
-        timestamp: new Date()
-      });
-    });
-
-    enhancedSessionEngine.on('news_injected', (data: { sessionId: string; news: any }) => {
-      this.broadcastToSession(data.sessionId, 'news_update', data.news);
-    });
-
-    enhancedSessionEngine.on('price_updated', (data: { sessionId: string; symbol: string; price: number; volume?: number }) => {
-      this.broadcastToSession(data.sessionId, 'price_update', {
-        symbol: data.symbol,
-        price: data.price,
-        volume: data.volume,
-        timestamp: new Date()
-      });
-    });
-
-    enhancedSessionEngine.on('privilege_granted', (data: { sessionId: string; privilegeCode: number; targetRole?: string; targetUsers?: string[] }) => {
-      this.broadcastToSession(data.sessionId, 'privilege_granted', {
-        privilegeCode: data.privilegeCode,
-        targetRole: data.targetRole,
-        targetUsers: data.targetUsers,
-        timestamp: new Date()
-      });
-    });
-
-    enhancedSessionEngine.on('participant_joined', (data: { sessionId: string; participant: SessionParticipant }) => {
-      this.broadcastToSession(data.sessionId, 'participant_joined', {
-        userId: data.participant.id,
-        username: data.participant.username,
-        role: data.participant.role,
-        timestamp: new Date()
-      });
-    });
-
-    enhancedSessionEngine.on('participant_left', (data: { sessionId: string; participantId: string }) => {
-      this.broadcastToSession(data.sessionId, 'participant_left', {
-        userId: data.participantId,
-        timestamp: new Date()
+      socket.on('disconnect', () => {
+        // Clean up user from active sessions
+        for (const [sessionId, users] of this.activeSessions.entries()) {
+          for (const userId of users) {
+            if (this.userSessions.get(userId) === sessionId) {
+              users.delete(userId);
+              this.userSessions.delete(userId);
+              
+              // Notify session of user departure
+              socket.to(`session_${sessionId}`).emit('user_left', {
+                userId,
+                timestamp: new Date()
+              });
+              break;
+            }
+          }
+        }
+        console.log('Client disconnected:', socket.id);
       });
     });
   }
 
-  /**
-   * Broadcast message to all users in a session
-   */
-  public broadcastToSession(sessionId: string, event: string, data: any): void {
-    this.io.to(`session:${sessionId}`).emit(event, data);
+  private async verifySessionAccess(sessionId: string, userId: string, role: string): Promise<boolean> {
+    try {
+      if (role === 'Instructor') {
+        // Verify instructor owns this session
+        const session = await prisma.simulationSession.findFirst({
+          where: {
+            id: sessionId,
+            class: {
+              instructorId: userId
+            }
+          }
+        });
+        return !!session;
+      } else {
+        // Verify student is enrolled in session
+        const sessionUser = await prisma.sessionUser.findFirst({
+          where: {
+            sessionId,
+            userId,
+            isActive: true
+          }
+        });
+        return !!sessionUser;
+      }
+    } catch (error) {
+      console.error('Error verifying session access:', error);
+      return false;
+    }
   }
 
-  /**
-   * Broadcast message to all users in a class
-   */
-  public broadcastToClass(classId: string, event: string, data: any): void {
-    this.io.to(`class:${classId}`).emit(event, data);
+  private async processOrder(sessionId: string, orderData: OrderData): Promise<any> {
+    try {
+      // Create order in database
+      const order = await prisma.order.create({
+        data: {
+          sessionId,
+          userId: orderData.userId,
+          securityId: orderData.securityId,
+          side: orderData.side,
+          quantity: orderData.quantity,
+          price: orderData.price,
+          type: orderData.type,
+          timeInForce: orderData.timeInForce,
+          status: 'PENDING',
+          submittedAt: new Date()
+        },
+        include: {
+          user: true,
+          security: true
+        }
+      });
+
+      // Simple matching logic (would be more sophisticated in production)
+      const trades = await this.matchOrder(order);
+
+      return {
+        success: true,
+        order,
+        trades,
+        marketUpdate: this.getMarketUpdate(orderData.symbol)
+      };
+    } catch (error) {
+      return {
+        success: false,
+        reason: 'Order processing failed'
+      };
+    }
   }
 
-  /**
-   * Send market data update
-   */
-  public broadcastMarketData(sessionId: string, marketData: MarketDataUpdate): void {
-    this.broadcastToSession(sessionId, 'market_data', marketData);
+  private async matchOrder(order: any): Promise<any[]> {
+    // Simplified matching engine - in production this would be much more sophisticated
+    // For now, just mark order as filled at submitted price
+    await prisma.order.update({
+      where: { id: order.id },
+      data: { status: 'FILLED' }
+    });
+
+    // Create an order execution record
+    const execution = await prisma.orderExecution.create({
+      data: {
+        orderId: order.id,
+        quantity: order.quantity,
+        price: order.price || this.getMarketPrice(order.security.symbol)
+        // timestamp is auto-generated
+      }
+    });
+
+    return [execution];
   }
 
-  /**
-   * Send order update
-   */
-  public broadcastOrderUpdate(sessionId: string, orderUpdate: OrderUpdate): void {
-    // Send to all session participants
-    this.broadcastToSession(sessionId, 'order_update', orderUpdate);
-    
-    // Send private update to order owner
-    this.sendToUser(orderUpdate.userId, 'my_order_update', orderUpdate);
+  private getMarketPrice(symbol: string): number {
+    const marketData = this.marketData.get(symbol);
+    return marketData?.lastPrice || 100; // Default price
   }
 
-  /**
-   * Send position update
-   */
-  public broadcastPositionUpdate(sessionId: string, positionUpdate: PositionUpdate): void {
-    // Send private update to user
-    this.sendToUser(positionUpdate.userId, 'position_update', positionUpdate);
+  private getMarketUpdate(symbol: string): MarketData | null {
+    return this.marketData.get(symbol) || null;
   }
 
-  /**
-   * Send message to specific user
-   */
-  public sendToUser(userId: string, event: string, data: any): void {
-    const userSockets = Array.from(this.connections.values())
-      .filter(socket => socket.userId === userId);
-    
-    userSockets.forEach(socket => {
-      socket.emit(event, data);
-    });
+  private updateMarketData(symbol: string, trades: any[]) {
+    if (trades.length === 0) return;
+
+    const lastTrade = trades[trades.length - 1];
+    const currentData = this.marketData.get(symbol) || {
+      symbol,
+      lastPrice: 100,
+      bid: 99.5,
+      ask: 100.5,
+      bidSize: 100,
+      askSize: 100,
+      volume: 0,
+      tick: 0
+    };
+
+    // Update with trade data
+    currentData.lastPrice = lastTrade.price;
+    currentData.volume += lastTrade.quantity;
+    currentData.tick += 1;
+
+    this.marketData.set(symbol, currentData);
+
+    // Broadcast market update to all sessions
+    this.io.emit('market_update', currentData);
   }
 
-  /**
-   * Send message to users with specific role in session
-   */
-  public broadcastToRole(sessionId: string, role: 'STUDENT' | 'INSTRUCTOR' | 'ADMIN', event: string, data: any): void {
-    const roleSockets = Array.from(this.connections.values())
-      .filter(socket => socket.sessionId === sessionId && socket.userRole === role);
-    
-    roleSockets.forEach(socket => {
-      socket.emit(event, data);
-    });
-  }
+  private initializeMarketData() {
+    // Initialize with default securities from the system
+    const defaultSecurities = [
+      { symbol: 'AOE', name: 'Alpha Omega Enterprises' },
+      { symbol: 'PNR', name: 'Pioneer Resources' },
+      { symbol: 'VGR', name: 'Vector Group' },
+      { symbol: 'BOND1', name: 'Treasury Bond 1Y' },
+      { symbol: 'BOND2', name: 'Corporate Bond 2Y' }
+    ];
 
-  /**
-   * Setup trading engine event listeners
-   */
-  private setupTradingEngineListeners(): void {
-    // Market data updates
-    tradingEngine.on('market_data', (data: { sessionId: string; symbol: string; data: any }) => {
-      this.broadcastToSession(data.sessionId, 'market_data', {
-        symbol: data.symbol,
-        ...data.data
-      });
-    });
-
-    // Order book updates
-    tradingEngine.on('order_book_update', (data: { symbol: string; orderBook: any }) => {
-      // Broadcast to all sessions that have this symbol active
-      this.io.emit('order_book_update', {
-        symbol: data.symbol,
-        orderBook: data.orderBook
-      });
-    });
-
-    // Order status updates
-    tradingEngine.on('order_placed', (data: { sessionId: string; userId: string; order: any }) => {
-      this.broadcastToSession(data.sessionId, 'order_update', {
-        type: 'PLACED',
-        order: data.order,
-        userId: data.userId
-      });
-    });
-
-    tradingEngine.on('order_filled', (data: { sessionId: string; order: any; trade: any; fillQuantity: number; fillPrice: number }) => {
-      this.broadcastToSession(data.sessionId, 'order_update', {
-        type: 'FILLED',
-        order: data.order,
-        trade: data.trade,
-        fillQuantity: data.fillQuantity,
-        fillPrice: data.fillPrice
-      });
-
-      // Send trade execution to order owner
-      const sessionUser = data.order.sessionUserId;
-      this.sendToUser(data.order.userId || sessionUser, 'trade_execution', {
-        orderId: data.order.id,
-        symbol: data.order.symbol,
-        side: data.order.side,
-        quantity: data.fillQuantity,
-        price: data.fillPrice,
-        timestamp: data.trade.timestamp
-      });
-    });
-
-    tradingEngine.on('order_cancelled', (data: { order: any }) => {
-      this.io.emit('order_update', {
-        type: 'CANCELLED',
-        order: data.order
-      });
-    });
-
-    tradingEngine.on('order_rejected', (data: { order: any; reason: string }) => {
-      this.sendToUser(data.order.userId, 'order_update', {
-        type: 'REJECTED',
-        order: data.order,
-        reason: data.reason
-      });
-    });
-
-    // Position updates
-    tradingEngine.on('position_updated', (data: { userId: string; symbol: string; position: any }) => {
-      this.sendToUser(data.userId, 'position_update', {
-        symbol: data.symbol,
-        position: data.position
-      });
-    });
-
-    // Market state changes
-    tradingEngine.on('market_opened', (data: { sessionId: string; symbols: string[] }) => {
-      this.broadcastToSession(data.sessionId, 'market_opened', {
-        symbols: data.symbols,
-        timestamp: new Date()
-      });
-    });
-
-    tradingEngine.on('market_closed', (data: { sessionId: string; symbols: string[] }) => {
-      this.broadcastToSession(data.sessionId, 'market_closed', {
-        symbols: data.symbols,
-        timestamp: new Date()
+    defaultSecurities.forEach(security => {
+      this.marketData.set(security.symbol, {
+        symbol: security.symbol,
+        lastPrice: 100,
+        bid: 99.5,
+        ask: 100.5,
+        bidSize: 100,
+        askSize: 100,
+        volume: 0,
+        tick: 0
       });
     });
   }
 
-  /**
-   * Process auction bid (placeholder)
-   */
-  private async processBid(sessionId: string, userId: string, bidData: any): Promise<void> {
-    // TODO: Implement with auction system
-    this.broadcastToSession(sessionId, 'bid_placed', {
-      auctionId: bidData.auctionId,
-      userId,
-      amount: bidData.amount,
+  // Methods for instructor controls
+  public broadcastSimulationUpdate(sessionId: string, update: any) {
+    this.io.to(`session_${sessionId}`).emit('simulation_update', update);
+  }
+
+  public broadcastMarketStateChange(sessionId: string, marketOpen: boolean) {
+    this.io.to(`session_${sessionId}`).emit('market_state_change', {
+      marketOpen,
       timestamp: new Date()
     });
   }
 
-  /**
-   * Process instructor command
-   */
-  private async processInstructorCommand(sessionId: string, commandData: any): Promise<void> {
-    const { command, parameters } = commandData;
-    
-    // Execute command through enhanced session engine
-    await enhancedSessionEngine.executeCommand(sessionId, { 
-      id: `cmd-${Date.now()}`,
-      type: command as any,
-      description: `Instructor command: ${command}`,
-      parameters 
-    });
-  }
-
-  /**
-   * Setup market data service event listeners
-   */
-  private setupMarketDataListeners(): void {
-    // Real-time market data updates
-    marketDataService.on('market_data', (data: { sessionId: string; symbol: string; data: any }) => {
-      this.broadcastToSession(data.sessionId, 'market_data', {
-        symbol: data.symbol,
-        ...data.data
-      });
-    });
-
-    // Market feed started
-    marketDataService.on('feed_started', (data: { sessionId: string; symbols: string[] }) => {
-      this.broadcastToSession(data.sessionId, 'market_feed_started', {
-        symbols: data.symbols,
-        timestamp: new Date()
-      });
-    });
-
-    // Market feed stopped
-    marketDataService.on('feed_stopped', (data: { sessionId: string }) => {
-      this.broadcastToSession(data.sessionId, 'market_feed_stopped', {
-        timestamp: new Date()
-      });
-    });
-
-    // News events
-    marketDataService.on('news_event', (data: { sessionId: string; event: any }) => {
-      this.broadcastToSession(data.sessionId, 'news_update', data.event);
-    });
-
-    // Price shocks
-    marketDataService.on('price_shock', (data: { sessionId: string; symbol: string; magnitude: number; direction: string; newPrice: number }) => {
-      this.broadcastToSession(data.sessionId, 'price_shock', {
-        symbol: data.symbol,
-        magnitude: data.magnitude,
-        direction: data.direction,
-        newPrice: data.newPrice,
-        timestamp: new Date()
-      });
-    });
-
-    // Trading halts
-    marketDataService.on('trading_halt', (data: { symbol: string; timestamp: Date }) => {
-      this.io.emit('trading_halt', data);
-    });
-
-    // Trading resumed
-    marketDataService.on('trading_resumed', (data: { symbol: string; timestamp: Date }) => {
-      this.io.emit('trading_resumed', data);
-    });
-
-    // Market events
-    marketDataService.on('market_event_executed', (data: { event: any }) => {
-      this.io.emit('market_event', data.event);
-    });
-
-    // Market reset
-    marketDataService.on('market_reset', (data: { symbols: string[] }) => {
-      this.io.emit('market_reset', {
-        symbols: data.symbols,
-        timestamp: new Date()
-      });
-    });
-  }
-
-  /**
-   * Setup position service event listeners
-   */
-  private setupPositionServiceListeners(): void {
-    // Portfolio initialization
-    positionService.on('portfolio_initialized', (data: { userId: string; portfolio: any }) => {
-      this.sendToUser(data.userId, 'portfolio_initialized', data.portfolio);
-    });
-
-    // Trade processed
-    positionService.on('trade_processed', (data: { trade: any }) => {
-      // Broadcast trade to session participants
-      if (data.trade.sessionId) {
-        this.broadcastToSession(data.trade.sessionId, 'trade_processed', data.trade);
-      }
-    });
-
-    // Position updates
-    positionService.on('position_updated', (data: { userId: string; symbol: string; position?: any }) => {
-      const portfolio = positionService.getPortfolio(data.userId);
-      const positions = positionService.getPositions(data.userId);
-      
-      this.sendToUser(data.userId, 'position_update', {
-        symbol: data.symbol,
-        position: data.position,
-        portfolio,
-        positions
-      });
-    });
-
-    // Portfolio updates
-    positionService.on('portfolio_updated', (data: { userId: string }) => {
-      const portfolio = positionService.getPortfolio(data.userId);
-      const positions = positionService.getPositions(data.userId);
-      
-      this.sendToUser(data.userId, 'portfolio_update', {
-        portfolio,
-        positions
-      });
-    });
-
-    // Risk metric updates
-    positionService.on('risk_updated', (data: { userId: string; metrics: any }) => {
-      this.sendToUser(data.userId, 'risk_metrics_update', data.metrics);
-    });
-
-    // Position liquidation
-    positionService.on('positions_liquidated', (data: { userId: string }) => {
-      const portfolio = positionService.getPortfolio(data.userId);
-      
-      this.sendToUser(data.userId, 'positions_liquidated', {
-        message: 'All positions have been liquidated',
-        portfolio
-      });
-    });
-  }
-
-  /**
-   * Get connection statistics
-   */
-  public getStats(): any {
-    return {
-      totalConnections: this.connections.size,
-      activeSessions: this.sessionRooms.size,
-      sessionRooms: Array.from(this.sessionRooms.entries()).map(([sessionId, users]) => ({
-        sessionId,
-        userCount: users.size
-      }))
-    };
+  public getActiveUsers(sessionId: string): string[] {
+    return Array.from(this.activeSessions.get(sessionId) || []);
   }
 }
 
-// Export singleton instance factory
-export function createWebSocketServer(httpServer: HTTPServer): WebSocketServer {
-  return new WebSocketServer(httpServer);
-}
+export default TradingWebSocketServer;

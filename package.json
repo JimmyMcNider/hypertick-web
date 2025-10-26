@@ -7,7 +7,7 @@
     "dev:next": "next dev",
     "dev:ws": "tsx server.ts",
     "build": "next build",
-    "start": "npx tsx server.ts",
+    "start": "node server.js",
     "start:next": "next start",
     "lint": "eslint",
     "db:generate": "prisma generate",

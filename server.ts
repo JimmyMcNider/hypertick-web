@@ -8,7 +8,7 @@
 import { createServer } from 'http';
 import { parse } from 'url';
 import next from 'next';
-import { createWebSocketServer } from './src/lib/websocket-server';
+import { initWebSocketServer } from './src/lib/websocket-server';
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
@@ -32,7 +32,7 @@ app.prepare().then(() => {
   });
 
   // Initialize WebSocket server
-  const wsServer = createWebSocketServer(server);
+  const wsServer = initWebSocketServer(server);
   console.log('WebSocket server initialized');
 
   // Start server

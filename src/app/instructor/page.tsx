@@ -11,6 +11,7 @@ import AnalyticsDashboard from '@/components/instructor/AnalyticsDashboard';
 import LessonAuthor from '@/components/instructor/LessonAuthor';
 import StudentManagement from '@/components/instructor/StudentManagement';
 import LiveSessionControl from '@/components/instructor/LiveSessionControl';
+import SimulationControl from '@/components/instructor/SimulationControl';
 
 interface User {
   id: string;
@@ -316,10 +317,13 @@ export default function InstructorPage() {
             )}
             
             {selectedTab === 'live' && (
-              <LiveSessionControl
-                user={user}
-                classId={selectedClass}
-              />
+              <div className="p-6">
+                {/* Import new SimulationControl */}
+                <SimulationControl 
+                  classId={selectedClass}
+                  userId={user?.id || ''}
+                />
+              </div>
             )}
             
             {selectedTab === 'author' && (

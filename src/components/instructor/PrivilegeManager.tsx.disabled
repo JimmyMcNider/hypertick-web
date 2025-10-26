@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useWebSocketInstructor } from '@/hooks/useWebSocket';
+// import { useWebSocketInstructor } from '@/hooks/useWebSocket';
 import { PRIVILEGE_DEFINITIONS } from '@/lib/privilege-system';
 import { sessionManager } from '@/lib/session-manager';
 import { 
@@ -55,7 +55,7 @@ export default function PrivilegeManager({ sessionId, participants }: PrivilegeM
   const [auctionMinBid, setAuctionMinBid] = useState(100);
   const [auctionDuration, setAuctionDuration] = useState(300); // 5 minutes
   
-  const ws = useWebSocketInstructor();
+  // const ws = useWebSocketInstructor();
 
   useEffect(() => {
     // Load initial privilege data
@@ -88,7 +88,7 @@ export default function PrivilegeManager({ sessionId, participants }: PrivilegeM
     if (!selectedPrivilege) return;
 
     try {
-      await ws.executeCommand('GRANT_PRIVILEGE', {
+      // await // ws.executeCommand('GRANT_PRIVILEGE', {
         privilegeId: selectedPrivilege,
         targetRole: selectedTargetRole
       });
@@ -103,7 +103,7 @@ export default function PrivilegeManager({ sessionId, participants }: PrivilegeM
     if (!selectedPrivilege) return;
 
     try {
-      await ws.executeCommand('REMOVE_PRIVILEGE', {
+      // await // ws.executeCommand('REMOVE_PRIVILEGE', {
         privilegeId: selectedPrivilege,
         targetRole: selectedTargetRole
       });
@@ -124,7 +124,7 @@ export default function PrivilegeManager({ sessionId, participants }: PrivilegeM
     }
 
     try {
-      await ws.executeCommand('CREATE_AUCTION', {
+      // await // ws.executeCommand('CREATE_AUCTION', {
         privilegeId: selectedPrivilege,
         minBid: auctionMinBid,
         duration: auctionDuration

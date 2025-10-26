@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { useWebSocket } from '@/hooks/useWebSocket';
 
 interface MarketData {
   symbol: string;
@@ -32,7 +32,7 @@ interface Order {
   id: string;
   symbol: string;
   side: 'BUY' | 'SELL';
-  type: 'MARKET' | 'LIMIT' | 'STOP';
+  type: 'MARKET' | 'LIMIT';
   quantity: number;
   price?: number;
   status: string;
@@ -51,129 +51,68 @@ interface Position {
 interface TradingTerminalProps {
   sessionId: string;
   userId: string;
-  token: string;
+  role?: 'Student' | 'Instructor';
 }
 
-const TradingTerminal: React.FC<TradingTerminalProps> = ({ sessionId, userId, token }) => {
-  const [socket, setSocket] = useState<Socket | null>(null);
-  const [marketData, setMarketData] = useState<Map<string, MarketData>>(new Map());
-  const [orderBooks, setOrderBooks] = useState<Map<string, OrderBook>>(new Map());
+const TradingTerminal: React.FC<TradingTerminalProps> = ({ sessionId, userId, role = 'Student' }) => {
+  // Use the new WebSocket hook
+  const { 
+    connected, 
+    marketData, 
+    orders, 
+    trades, 
+    submitOrder, 
+    error, 
+    clearError 
+  } = useWebSocket({ sessionId, userId, role });
+
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
   const [selectedSymbol, setSelectedSymbol] = useState('AOE');
   const [orderForm, setOrderForm] = useState({
     symbol: 'AOE',
     side: 'BUY' as 'BUY' | 'SELL',
-    type: 'MARKET' as 'MARKET' | 'LIMIT' | 'STOP',
+    type: 'MARKET' as 'MARKET' | 'LIMIT',
     quantity: 100,
     price: undefined as number | undefined
   });
-  const [connectionStatus, setConnectionStatus] = useState('disconnected');
 
-  const watchlistSymbols = ['AOE', 'BOND1', 'BOND2', 'BOND3', 'SPX'];
+  const watchlistSymbols = ['AOE', 'PNR', 'VGR', 'BOND1', 'BOND2'];
 
+  // Update active orders and positions when new data comes from WebSocket
   useEffect(() => {
-    if (!token || !userId) {
-      setConnectionStatus('auth_error');
-      return;
-    }
+    setActiveOrders(orders);
+  }, [orders]);
 
-    // Initialize WebSocket connection
-    const newSocket = io('/', {
-      transports: ['websocket', 'polling']
-    });
-
-    newSocket.on('connect', () => {
-      setConnectionStatus('connected');
-      
-      // Authenticate
-      newSocket.emit('authenticate', { token });
-      
-      // Join session
-      setTimeout(() => {
-        newSocket.emit('join_session', { sessionId });
-      }, 500);
-    });
-
-    newSocket.on('disconnect', () => {
-      setConnectionStatus('disconnected');
-    });
-
-    newSocket.on('authenticated', (data) => {
-      console.log('Authenticated:', data);
-      
-      // Request initial data after authentication
-      setTimeout(() => {
-        watchlistSymbols.forEach(symbol => {
-          newSocket.emit('get_market_data', { symbol });
-        });
-        newSocket.emit('get_portfolio', {});
-      }, 1000);
-    });
-
-    newSocket.on('auth_error', (data) => {
-      console.error('Auth error:', data);
-      setConnectionStatus('auth_error');
-    });
-
-    // Market data updates
-    newSocket.on('market_data', (data: MarketData) => {
-      setMarketData(prev => new Map(prev.set(data.symbol, data)));
-    });
-
-    // Order book updates
-    newSocket.on('order_book_update', (data: { symbol: string; orderBook: OrderBook }) => {
-      setOrderBooks(prev => new Map(prev.set(data.symbol, data.orderBook)));
-    });
-
-    // Order updates
-    newSocket.on('order_update', (data: any) => {
-      if (data.type === 'PLACED') {
-        setActiveOrders(prev => [...prev, data.order]);
-      } else if (data.type === 'FILLED' || data.type === 'CANCELLED') {
-        setActiveOrders(prev => prev.filter(order => order.id !== data.order.id));
-      }
-    });
-
-    // Position updates
-    newSocket.on('position_update', (data: { positions: Position[] }) => {
-      setPositions(data.positions);
-    });
-
-    // Trade executions
-    newSocket.on('trade_execution', (data: any) => {
-      console.log('Trade executed:', data);
-    });
-
-    // Error handling
-    newSocket.on('error', (data: { error: string }) => {
-      console.error('Socket error:', data.error);
-    });
-
-    newSocket.on('order_error', (data: { error: string }) => {
-      console.error('Order error:', data.error);
-    });
-
-    setSocket(newSocket);
-
-    return () => {
-      newSocket.disconnect();
-    };
-  }, [sessionId, userId, token]);
+  // Convert market data array to map for easier access
+  const marketDataMap = new Map(marketData.map(md => [md.symbol, {
+    symbol: md.symbol,
+    bid: md.bid,
+    ask: md.ask,
+    last: md.lastPrice,
+    change: md.lastPrice - 100, // Calculate change from base price
+    changePercent: ((md.lastPrice - 100) / 100) * 100,
+    volume: md.volume,
+    timestamp: new Date()
+  }]));
 
   const handlePlaceOrder = () => {
-    if (!socket) return;
+    if (!connected) return;
+
+    // Find security ID for the symbol (for now using symbol as securityId)
+    const securityId = orderForm.symbol;
 
     const orderData = {
+      securityId,
       symbol: orderForm.symbol,
       side: orderForm.side,
       type: orderForm.type,
       quantity: orderForm.quantity,
       price: orderForm.type !== 'MARKET' ? orderForm.price : undefined,
-      timeInForce: 'DAY'
+      timeInForce: 'GTC' as 'GTC' | 'IOC' | 'FOK'
     };
 
-    socket.emit('place_order', orderData);
+    submitOrder(orderData);
     
     // Reset form
     setOrderForm(prev => ({
@@ -184,8 +123,8 @@ const TradingTerminal: React.FC<TradingTerminalProps> = ({ sessionId, userId, to
   };
 
   const handleCancelOrder = (orderId: string) => {
-    if (!socket) return;
-    socket.emit('cancel_order', { orderId });
+    // This would need to be implemented in the WebSocket server
+    console.log('Cancel order:', orderId);
   };
 
   const formatPrice = (price: number) => price.toFixed(2);
@@ -194,8 +133,16 @@ const TradingTerminal: React.FC<TradingTerminalProps> = ({ sessionId, userId, to
     return `${sign}${percent.toFixed(2)}%`;
   };
 
-  const selectedMarketData = marketData.get(selectedSymbol);
-  const selectedOrderBook = orderBooks.get(selectedSymbol);
+  const selectedMarketData = marketDataMap.get(selectedSymbol);
+  
+  // Create mock order book from market data
+  const selectedOrderBook = selectedMarketData ? {
+    symbol: selectedSymbol,
+    bids: [{ price: selectedMarketData.bid, size: 100, orders: 1 }],
+    asks: [{ price: selectedMarketData.ask, size: 100, orders: 1 }],
+    spread: selectedMarketData.ask - selectedMarketData.bid,
+    timestamp: new Date()
+  } : null;
 
   return (
     <div className="trading-terminal bg-gray-900 text-white p-4 space-y-4">
@@ -203,11 +150,31 @@ const TradingTerminal: React.FC<TradingTerminalProps> = ({ sessionId, userId, to
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold">Trading Terminal</h2>
         <div className={`px-3 py-1 rounded text-sm ${
-          connectionStatus === 'connected' ? 'bg-green-600' : 
-          connectionStatus === 'auth_error' ? 'bg-red-600' : 'bg-yellow-600'
+          connected ? 'bg-green-600' : 'bg-red-600'
         }`}>
-          {connectionStatus === 'connected' ? 'Connected' :
-           connectionStatus === 'auth_error' ? 'Auth Error' : 'Connecting...'}
+          {connected ? 'Connected' : 'Disconnected'}
+        </div>
+      </div>
+
+      {/* Error Display */}
+      {error && (
+        <div className="bg-red-600 text-white p-3 rounded mb-4">
+          <div className="flex justify-between items-center">
+            <span>{error}</span>
+            <button 
+              onClick={clearError}
+              className="text-white hover:text-gray-200"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Session Info */}
+      <div className="bg-gray-800 p-3 rounded">
+        <div className="text-sm text-gray-300">
+          Session: {sessionId} | User: {userId} | Role: {role}
         </div>
       </div>
 
@@ -217,7 +184,7 @@ const TradingTerminal: React.FC<TradingTerminalProps> = ({ sessionId, userId, to
           <h3 className="text-lg font-semibold mb-3">Market Watch</h3>
           <div className="space-y-2">
             {watchlistSymbols.map(symbol => {
-              const data = marketData.get(symbol);
+              const data = marketDataMap.get(symbol);
               return (
                 <div
                   key={symbol}
@@ -366,7 +333,7 @@ const TradingTerminal: React.FC<TradingTerminalProps> = ({ sessionId, userId, to
 
             <button
               onClick={handlePlaceOrder}
-              disabled={connectionStatus !== 'connected'}
+              disabled={!connected}
               className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 py-2 rounded font-semibold"
             >
               Place Order

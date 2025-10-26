@@ -21,7 +21,7 @@ import {
   VolumeX,
   Volume2
 } from 'lucide-react';
-import { useWebSocket, useWebSocketEvent } from '@/hooks/useWebSocket';
+import { useWebSocket } from '@/hooks/useWebSocket';
 
 interface SimulationSession {
   id: string;
@@ -70,77 +70,52 @@ export default function LiveSimulationControl({
   const [currentAnnouncement, setCurrentAnnouncement] = useState('');
 
   // WebSocket integration for real-time updates
-  const { emit, isConnected, joinSession, leaveSession } = useWebSocket();
+  // TODO: Update to use new WebSocket hook when needed
+  // const { emit, // isConnected, joinSession, leaveSession } = useWebSocket();
 
-  // Set up WebSocket event listeners using the useWebSocketEvent hook
-  useWebSocketEvent('session_started', (data: any) => {
-    console.log('Session started:', data);
-    loadSessionData();
+  // // useWebSocketEvent('privilege_granted', (data: any) => {
+  //   console.log('Privilege granted:', data);
+  //   loadSessionData();
+  // });
+
+  // useWebSocketEvent('market_opened', (data: any) => {
+  //   console.log('Market opened:', data);
+  //   loadSessionData();
+  // });
+
+  // useWebSocketEvent('market_closed', (data: any) => {
+//   console.log('Market closed:', data);
+//   loadSessionData();
   });
 
-  useWebSocketEvent('session_paused', (data: any) => {
-    console.log('Session paused:', data);
-    loadSessionData();
+  // useWebSocketEvent('participant_joined', (data: any) => {
+//   console.log('Participant joined:', data);
+//   loadSessionData();
   });
 
-  useWebSocketEvent('session_resumed', (data: any) => {
-    console.log('Session resumed:', data);
-    loadSessionData();
-  });
-
-  useWebSocketEvent('session_ended', (data: any) => {
-    console.log('Session ended:', data);
-    loadSessionData();
-  });
-
-  useWebSocketEvent('command_executed', (data: any) => {
-    console.log('Command executed:', data);
-    loadSessionData();
-  });
-
-  useWebSocketEvent('privilege_granted', (data: any) => {
-    console.log('Privilege granted:', data);
-    loadSessionData();
-  });
-
-  useWebSocketEvent('market_opened', (data: any) => {
-    console.log('Market opened:', data);
-    loadSessionData();
-  });
-
-  useWebSocketEvent('market_closed', (data: any) => {
-    console.log('Market closed:', data);
-    loadSessionData();
-  });
-
-  useWebSocketEvent('participant_joined', (data: any) => {
-    console.log('Participant joined:', data);
-    loadSessionData();
-  });
-
-  useWebSocketEvent('participant_left', (data: any) => {
-    console.log('Participant left:', data);
-    loadSessionData();
+  // useWebSocketEvent('participant_left', (data: any) => {
+//   console.log('Participant left:', data);
+//   loadSessionData();
   });
 
   // Join session when component mounts and leave when it unmounts
   useEffect(() => {
-    if (isConnected && sessionId) {
-      joinSession(sessionId).catch(error => {
+    if (// isConnected && sessionId) {
+      // joinSession(sessionId).catch(error => {
         console.error('Failed to join session:', error);
       });
     }
 
     return () => {
-      if (isConnected) {
-        leaveSession();
+      if (// isConnected) {
+        // leaveSession();
       }
     };
-  }, [isConnected, sessionId, joinSession, leaveSession]);
+  }, [// isConnected, sessionId, joinSession, leaveSession]);
 
   // Load session data
   useEffect(() => {
-    loadSessionData();
+//   loadSessionData();
     const interval = setInterval(loadSessionData, 2000);
     return () => clearInterval(interval);
   }, [sessionId]);
@@ -363,9 +338,9 @@ export default function LiveSimulationControl({
               )}
             </div>
             <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+              <div className={`w-2 h-2 rounded-full ${// isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
               <span className="text-xs text-gray-500">
-                {isConnected ? 'Connected' : 'Disconnected'}
+                {// isConnected ? 'Connected' : 'Disconnected'}
               </span>
             </div>
           </CardTitle>

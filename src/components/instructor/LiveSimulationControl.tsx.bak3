@@ -1,0 +1,603 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { 
+  Play, 
+  Pause, 
+  Square, 
+  Users, 
+  Clock, 
+  BarChart3, 
+  AlertTriangle, 
+  Settings, 
+  RefreshCw,
+  FileText,
+  Zap,
+  Eye,
+  VolumeX,
+  Volume2
+} from 'lucide-react';
+import { useWebSocket } from '@/hooks/useWebSocket';
+
+interface SimulationSession {
+  id: string;
+  lessonTitle: string;
+  scenario: string;
+  status: 'PENDING' | 'IN_PROGRESS' | 'PAUSED' | 'COMPLETED';
+  startTime: Date;
+  duration: number;
+  elapsed: number;
+  participants: {
+    id: string;
+    name: string;
+    role: string;
+    connected: boolean;
+    privileges: number[];
+  }[];
+  marketState: {
+    isOpen: boolean;
+    symbols: string[];
+    totalVolume: number;
+    lastUpdate: Date;
+  };
+}
+
+interface LiveSimulationControlProps {
+  sessionId: string;
+  classId: string;
+  onCommandExecute: (command: string, parameters: any[]) => void;
+}
+
+export default function LiveSimulationControl({ 
+  sessionId, 
+  classId, 
+  onCommandExecute 
+}: LiveSimulationControlProps) {
+  const [session, setSession] = useState<SimulationSession | null>(null);
+  const [selectedScenario, setSelectedScenario] = useState<string>('Simulation A');
+  const [availableScenarios] = useState([
+    'Simulation A',
+    'Simulation B', 
+    'Simulation C'
+  ]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showAdvancedControls, setShowAdvancedControls] = useState(false);
+  const [announcements, setAnnouncements] = useState<string[]>([]);
+  const [currentAnnouncement, setCurrentAnnouncement] = useState('');
+
+  // WebSocket integration for real-time updates
+  // TODO: Update to use new WebSocket hook when needed
+  // const { emit, // isConnected, joinSession, leaveSession } = useWebSocket();
+
+  // // useWebSocketEvent('privilege_granted', (data: any) => {
+  //   console.log('Privilege granted:', data);
+  //   loadSessionData();
+  // });
+
+  // useWebSocketEvent('market_opened', (data: any) => {
+  //   console.log('Market opened:', data);
+  //   loadSessionData();
+  // });
+
+  // useWebSocketEvent('market_closed', (data: any) => {
+    console.log('Market closed:', data);
+    loadSessionData();
+  });
+
+  // useWebSocketEvent('participant_joined', (data: any) => {
+    console.log('Participant joined:', data);
+    loadSessionData();
+  });
+
+  // useWebSocketEvent('participant_left', (data: any) => {
+    console.log('Participant left:', data);
+    loadSessionData();
+  });
+
+  // Join session when component mounts and leave when it unmounts
+  useEffect(() => {
+    if (// isConnected && sessionId) {
+      // joinSession(sessionId).catch(error => {
+        console.error('Failed to join session:', error);
+      });
+    }
+
+    return () => {
+      if (// isConnected) {
+        // leaveSession();
+      }
+    };
+  }, [// isConnected, sessionId, joinSession, leaveSession]);
+
+  // Load session data
+  useEffect(() => {
+    loadSessionData();
+    const interval = setInterval(loadSessionData, 2000);
+    return () => clearInterval(interval);
+  }, [sessionId]);
+
+  const loadSessionData = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/sessions/${sessionId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setSession(data);
+      }
+    } catch (error) {
+      console.error('Failed to load session data:', error);
+    }
+  }, [sessionId]);
+
+  const startSimulation = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/sessions/manage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'START_SESSION',
+          sessionId,
+          scenario: selectedScenario,
+          classId
+        })
+      });
+
+      if (response.ok) {
+        onCommandExecute('START_SESSION', [selectedScenario]);
+        await loadSessionData();
+      }
+    } catch (error) {
+      console.error('Failed to start simulation:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const pauseSimulation = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/sessions/manage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'PAUSE_SESSION',
+          sessionId
+        })
+      });
+
+      if (response.ok) {
+        onCommandExecute('PAUSE_SESSION', []);
+        await loadSessionData();
+      }
+    } catch (error) {
+      console.error('Failed to pause simulation:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const resumeSimulation = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/sessions/manage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'RESUME_SESSION',
+          sessionId
+        })
+      });
+
+      if (response.ok) {
+        onCommandExecute('RESUME_SESSION', []);
+        await loadSessionData();
+      }
+    } catch (error) {
+      console.error('Failed to resume simulation:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const stopSimulation = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/sessions/manage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'END_SESSION',
+          sessionId
+        })
+      });
+
+      if (response.ok) {
+        onCommandExecute('END_SESSION', []);
+        await loadSessionData();
+      }
+    } catch (error) {
+      console.error('Failed to stop simulation:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const executePrivilegeCommand = async (command: 'GRANT' | 'REMOVE', privilegeId: number, targetRole: string = '$All') => {
+    const commandType = command === 'GRANT' ? 'GRANT_PRIVILEGE' : 'REMOVE_PRIVILEGE';
+    
+    try {
+      const response = await fetch('/api/sessions/manage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'EXECUTE_COMMAND',
+          sessionId,
+          parameters: {
+            type: commandType,
+            parameters: {
+              privilegeCode: privilegeId,
+              targetRole: targetRole
+            }
+          }
+        })
+      });
+
+      if (response.ok) {
+        onCommandExecute(commandType, [privilegeId, targetRole]);
+        await loadSessionData();
+      }
+    } catch (error) {
+      console.error(`Failed to ${command.toLowerCase()} privilege:`, error);
+    }
+  };
+
+  const executeAdvancedCommand = async (commandType: string, parameters: any) => {
+    try {
+      const response = await fetch('/api/sessions/manage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'EXECUTE_COMMAND',
+          sessionId,
+          parameters: {
+            type: commandType,
+            parameters
+          }
+        })
+      });
+
+      if (response.ok) {
+        onCommandExecute(commandType, [parameters]);
+        await loadSessionData();
+      }
+    } catch (error) {
+      console.error(`Failed to execute ${commandType}:`, error);
+    }
+  };
+
+  const broadcastAnnouncement = async () => {
+    if (!currentAnnouncement.trim()) return;
+
+    try {
+      const response = await fetch('/api/notifications/broadcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId,
+          message: currentAnnouncement,
+          type: 'ANNOUNCEMENT'
+        })
+      });
+
+      if (response.ok) {
+        setAnnouncements(prev => [...prev, currentAnnouncement]);
+        setCurrentAnnouncement('');
+      }
+    } catch (error) {
+      console.error('Failed to broadcast announcement:', error);
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'IN_PROGRESS': return 'bg-green-600';
+      case 'PAUSED': return 'bg-yellow-600';
+      case 'PENDING': return 'bg-gray-600';
+      case 'COMPLETED': return 'bg-blue-600';
+      default: return 'bg-gray-600';
+    }
+  };
+
+  const connectedParticipants = session?.participants.filter(p => p.connected).length || 0;
+  const totalParticipants = session?.participants.length || 0;
+  const progressPercentage = session ? (session.elapsed / session.duration) * 100 : 0;
+
+  return (
+    <div className="space-y-6">
+      {/* Main Control Panel */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Zap className="h-5 w-5" />
+              Live Simulation Control
+              {session && (
+                <Badge className={`ml-2 ${getStatusColor(session.status)} text-white`}>
+                  {session.status}
+                </Badge>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${// isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+              <span className="text-xs text-gray-500">
+                {// isConnected ? 'Connected' : 'Disconnected'}
+              </span>
+            </div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Session Status */}
+          {session ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-gray-700">Current Session</div>
+                <div className="text-lg font-bold">{session.lessonTitle}</div>
+                <div className="text-sm text-gray-600">{session.scenario}</div>
+              </div>
+              
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-gray-700">Participants</div>
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  <span className="font-bold">{connectedParticipants}/{totalParticipants}</span>
+                  <span className="text-sm text-gray-600">connected</span>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-gray-700">Progress</div>
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  <span className="font-bold">{formatTime(session.elapsed)}</span>
+                  <span className="text-sm text-gray-600">/ {formatTime(session.duration)}</span>
+                </div>
+                <Progress value={progressPercentage} className="w-full" />
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <div className="text-gray-500">No active session</div>
+              <div className="text-sm text-gray-400">Select a scenario and start a simulation</div>
+            </div>
+          )}
+
+          {/* Scenario Selection & Controls */}
+          <div className="flex items-center gap-4 pt-4 border-t border-gray-200">
+            <div className="flex-1">
+              <label className="text-sm font-medium text-gray-700 mb-2 block">
+                Scenario Selection
+              </label>
+              <select 
+                value={selectedScenario}
+                onChange={(e) => setSelectedScenario(e.target.value)}
+                disabled={session?.status === 'IN_PROGRESS'}
+                className="w-full border-2 border-gray-300 rounded-md px-3 py-2 text-sm font-medium"
+              >
+                {availableScenarios.map(scenario => (
+                  <option key={scenario} value={scenario}>{scenario}</option>
+                ))}
+              </select>
+            </div>
+            
+            <div className="flex gap-2">
+              {!session || session.status === 'PENDING' || session.status === 'COMPLETED' ? (
+                <Button 
+                  onClick={startSimulation}
+                  disabled={isLoading}
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                >
+                  <Play className="h-4 w-4 mr-2" />
+                  Start Simulation
+                </Button>
+              ) : session.status === 'IN_PROGRESS' ? (
+                <Button 
+                  onClick={pauseSimulation}
+                  disabled={isLoading}
+                  variant="secondary"
+                >
+                  <Pause className="h-4 w-4 mr-2" />
+                  Pause
+                </Button>
+              ) : session.status === 'PAUSED' ? (
+                <Button 
+                  onClick={resumeSimulation}
+                  disabled={isLoading}
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                >
+                  <Play className="h-4 w-4 mr-2" />
+                  Resume
+                </Button>
+              ) : null}
+              
+              {session && session.status !== 'COMPLETED' && (
+                <Button 
+                  onClick={stopSimulation}
+                  disabled={isLoading}
+                  variant="destructive"
+                >
+                  <Square className="h-4 w-4 mr-2" />
+                  Stop
+                </Button>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Quick Privilege Controls */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="h-5 w-5" />
+            Quick Privilege Controls
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              { id: 9, name: 'Montage', desc: 'Level II Order Book' },
+              { id: 22, name: 'Market Making', desc: 'Limit Order Rights' },
+              { id: 23, name: 'Analyst Signals', desc: 'Premium Information' },
+              { id: 32, name: 'Auction Rights', desc: 'Privilege Bidding' }
+            ].map(privilege => (
+              <div key={privilege.id} className="border border-gray-300 rounded-lg p-3">
+                <div className="font-medium text-sm">{privilege.name}</div>
+                <div className="text-xs text-gray-600 mb-2">{privilege.desc}</div>
+                <div className="flex gap-1">
+                  <Button 
+                    size="sm" 
+                    onClick={() => executePrivilegeCommand('GRANT', privilege.id)}
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white text-xs"
+                  >
+                    Grant
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => executePrivilegeCommand('REMOVE', privilege.id)}
+                    className="flex-1 text-xs"
+                  >
+                    Remove
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Announcements */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Volume2 className="h-5 w-5" />
+            Classroom Announcements
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={currentAnnouncement}
+              onChange={(e) => setCurrentAnnouncement(e.target.value)}
+              placeholder="Type announcement to all students..."
+              className="flex-1 border-2 border-gray-300 rounded-md px-3 py-2 text-sm"
+              onKeyPress={(e) => e.key === 'Enter' && broadcastAnnouncement()}
+            />
+            <Button 
+              onClick={broadcastAnnouncement}
+              disabled={!currentAnnouncement.trim()}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              Broadcast
+            </Button>
+          </div>
+          
+          {announcements.length > 0 && (
+            <div className="space-y-2 max-h-32 overflow-y-auto">
+              <div className="text-sm font-medium text-gray-700">Recent Announcements:</div>
+              {announcements.slice(-3).map((announcement, index) => (
+                <div key={index} className="text-sm bg-blue-50 border-l-4 border-blue-400 p-2">
+                  {announcement}
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Advanced Controls */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              Advanced Controls
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAdvancedControls(!showAdvancedControls)}
+            >
+              {showAdvancedControls ? 'Hide' : 'Show'}
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        {showAdvancedControls && (
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <Button 
+                variant="outline" 
+                onClick={() => executeAdvancedCommand('OPEN_MARKET', { symbols: ['AOE', 'BOND1', 'BOND2'] })}
+                className="text-sm"
+              >
+                <BarChart3 className="h-4 w-4 mr-2" />
+                Open Market
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => executeAdvancedCommand('CLOSE_MARKET', { symbols: [] })}
+                className="text-sm"
+              >
+                <VolumeX className="h-4 w-4 mr-2" />
+                Close Market
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => executeAdvancedCommand('CREATE_AUCTION', { symbol: 'AOE', duration: 60, minimumBid: 100, description: 'Market Making Auction' })}
+                className="text-sm"
+              >
+                <Zap className="h-4 w-4 mr-2" />
+                Start Auction
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => executeAdvancedCommand('SET_LIQUIDITY_TRADER', { username: 'liquidity_bot', enabled: true })}
+                className="text-sm"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Enable Liquidity
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => window.open('/api/sessions/' + sessionId + '/report', '_blank')}
+                className="text-sm"
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                Generate Report
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => executeAdvancedCommand('RESET_POSITIONS', { targetUsers: [] })}
+                className="text-sm"
+              >
+                <AlertTriangle className="h-4 w-4 mr-2" />
+                Reset Positions
+              </Button>
+            </div>
+          </CardContent>
+        )}
+      </Card>
+    </div>
+  );
+}
