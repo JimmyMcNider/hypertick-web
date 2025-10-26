@@ -26,48 +26,59 @@ import {
 // Theme definitions
 export const TRADING_THEMES = {
   classic: {
-    name: 'Classic Green',
+    name: 'Matrix Green',
     background: 'bg-black',
     text: 'text-green-400',
     header: 'bg-gray-900',
-    border: 'border-green-400',
-    accent: 'text-green-400',
-    positive: 'text-green-400',
-    negative: 'text-red-400',
-    neutral: 'text-yellow-400'
-  },
-  bloomberg: {
-    name: 'Bloomberg Orange',
-    background: 'bg-gray-900',
-    text: 'text-orange-300',
-    header: 'bg-orange-800',
-    border: 'border-orange-400',
-    accent: 'text-orange-400',
-    positive: 'text-green-400',
-    negative: 'text-red-400',
-    neutral: 'text-orange-300'
+    border: 'border-green-500',
+    accent: 'text-lime-400',
+    positive: 'text-emerald-300',
+    negative: 'text-red-500',
+    neutral: 'text-green-200'
   },
   professional: {
-    name: 'Professional Blue',
-    background: 'bg-slate-900',
-    text: 'text-blue-300',
-    header: 'bg-blue-800',
-    border: 'border-blue-400',
-    accent: 'text-blue-400',
+    name: 'Arctic Blue',
+    background: 'bg-slate-950',
+    text: 'text-cyan-300',
+    header: 'bg-blue-900',
+    border: 'border-cyan-400',
+    accent: 'text-sky-400',
     positive: 'text-emerald-400',
-    negative: 'text-red-400',
-    neutral: 'text-slate-300'
+    negative: 'text-orange-400',
+    neutral: 'text-slate-200'
   },
   highContrast: {
-    name: 'High Contrast',
-    background: 'bg-black',
-    text: 'text-white',
-    header: 'bg-gray-800',
-    border: 'border-white',
-    accent: 'text-cyan-400',
+    name: 'Solar Flare',
+    background: 'bg-yellow-50',
+    text: 'text-gray-900',
+    header: 'bg-orange-600',
+    border: 'border-orange-500',
+    accent: 'text-orange-700',
+    positive: 'text-green-700',
+    negative: 'text-red-700',
+    neutral: 'text-amber-800'
+  },
+  cyberpunk: {
+    name: 'Cyberpunk Pink',
+    background: 'bg-purple-950',
+    text: 'text-pink-300',
+    header: 'bg-fuchsia-900',
+    border: 'border-pink-400',
+    accent: 'text-fuchsia-400',
+    positive: 'text-green-400',
+    negative: 'text-red-400',
+    neutral: 'text-purple-200'
+  },
+  retro: {
+    name: 'Retro Amber',
+    background: 'bg-amber-950',
+    text: 'text-amber-300',
+    header: 'bg-orange-900',
+    border: 'border-amber-400',
+    accent: 'text-yellow-400',
     positive: 'text-lime-400',
     negative: 'text-red-400',
-    neutral: 'text-yellow-300'
+    neutral: 'text-amber-200'
   }
 };
 
@@ -878,6 +889,34 @@ export default function ProfessionalTradingWorkspace({
   useEffect(() => {
     setCurrentTheme(initialTheme);
   }, [initialTheme]);
+
+  // Load saved layout on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('hypertick-layout');
+    if (saved) {
+      try {
+        const layout = JSON.parse(saved);
+        setWindows(prev => prev.map(window => {
+          const savedWindow = layout.find((l: any) => l.id === window.id);
+          return savedWindow ? { ...window, position: savedWindow.position, isMinimized: savedWindow.isMinimized } : window;
+        }));
+      } catch (error) {
+        console.error('Failed to load saved layout:', error);
+      }
+    }
+  }, []);
+
+  // Listen for save layout events from navbar
+  useEffect(() => {
+    const handleSaveLayout = () => {
+      const layout = windows.map(({ id, position, isMinimized }) => ({ id, position, isMinimized }));
+      localStorage.setItem('hypertick-layout', JSON.stringify(layout));
+      alert('Layout saved successfully!');
+    };
+
+    window.addEventListener('saveLayout', handleSaveLayout);
+    return () => window.removeEventListener('saveLayout', handleSaveLayout);
+  }, [windows]);
   
   const [windows, setWindows] = useState<TradingWindow[]>([
     // Row 1: Order Window and Market Graph - MAIN TRADING TOOLS
@@ -971,7 +1010,9 @@ export default function ProfessionalTradingWorkspace({
   ]);
 
   const [nextZIndex, setNextZIndex] = useState(10);
+  const [isResizing, setIsResizing] = useState<string | null>(null);
   const dragRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  const resizeRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
   const bringToFront = useCallback((windowId: string) => {
     setWindows(prev => prev.map(window => ({
@@ -983,6 +1024,43 @@ export default function ProfessionalTradingWorkspace({
     })));
     setNextZIndex(prev => prev + 1);
   }, [nextZIndex]);
+
+  const handleResize = useCallback((windowId: string, newWidth: number | string, newHeight: number | string) => {
+    setWindows(prev => prev.map(window => 
+      window.id === windowId 
+        ? { ...window, position: { ...window.position, width: newWidth, height: newHeight } }
+        : window
+    ));
+  }, []);
+
+  const saveLayout = useCallback(() => {
+    const layout = windows.map(({ id, position, isMinimized }) => ({ id, position, isMinimized }));
+    localStorage.setItem('hypertick-layout', JSON.stringify(layout));
+    alert('Layout saved successfully!');
+  }, [windows]);
+
+  const loadLayout = useCallback(() => {
+    const saved = localStorage.getItem('hypertick-layout');
+    if (saved) {
+      try {
+        const layout = JSON.parse(saved);
+        setWindows(prev => prev.map(window => {
+          const savedWindow = layout.find((l: any) => l.id === window.id);
+          return savedWindow ? { ...window, position: savedWindow.position, isMinimized: savedWindow.isMinimized } : window;
+        }));
+        alert('Layout loaded successfully!');
+      } catch (error) {
+        alert('Failed to load layout');
+      }
+    } else {
+      alert('No saved layout found');
+    }
+  }, []);
+
+  const resetToDefault = useCallback(() => {
+    // Reset to original default layout
+    window.location.reload();
+  }, []);
 
   const toggleMinimize = useCallback((windowId: string) => {
     setWindows(prev => prev.map(window => 

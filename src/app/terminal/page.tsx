@@ -69,7 +69,7 @@ export default function TradingTerminal() {
   const [windows, setWindows] = useState<TradingWindow[]>([]);
   const [maxZIndex, setMaxZIndex] = useState(1000);
   const [loading, setLoading] = useState(true);
-  const [currentTheme, setCurrentTheme] = useState<'classic' | 'professional' | 'highContrast'>('classic');
+  const [currentTheme, setCurrentTheme] = useState<'classic' | 'professional' | 'highContrast' | 'cyberpunk' | 'retro'>('classic');
   const [dragState, setDragState] = useState<{
     isDragging: boolean;
     windowId: string | null;
@@ -389,13 +389,56 @@ export default function TradingTerminal() {
             <span className="text-xs">THEME:</span>
             <select
               value={currentTheme}
-              onChange={(e) => setCurrentTheme(e.target.value as 'classic' | 'professional' | 'highContrast')}
+              onChange={(e) => setCurrentTheme(e.target.value as 'classic' | 'professional' | 'highContrast' | 'cyberpunk' | 'retro')}
               className="bg-black text-orange-400 px-2 py-1 rounded text-xs border border-orange-600 hover:bg-gray-800"
             >
-              <option value="classic">Classic Green</option>
-              <option value="professional">Professional Blue</option>
-              <option value="highContrast">High Contrast</option>
+              <option value="classic">Matrix Green</option>
+              <option value="professional">Arctic Blue</option>
+              <option value="highContrast">Solar Flare</option>
+              <option value="cyberpunk">Cyberpunk Pink</option>
+              <option value="retro">Retro Amber</option>
             </select>
+          </div>
+
+          {/* Layout Controls */}
+          <div className="flex items-center space-x-1">
+            <span className="text-xs">LAYOUT:</span>
+            <button
+              onClick={() => {
+                const layout = JSON.parse(localStorage.getItem('hypertick-layout') || '[]');
+                if (layout.length > 0) {
+                  window.location.reload();
+                } else {
+                  alert('No saved layout found');
+                }
+              }}
+              className="bg-black text-orange-400 px-1 py-1 rounded text-xs border border-orange-600 hover:bg-gray-800"
+              title="Load Saved Layout"
+            >
+              LOAD
+            </button>
+            <button
+              onClick={() => {
+                const event = new CustomEvent('saveLayout');
+                window.dispatchEvent(event);
+              }}
+              className="bg-black text-orange-400 px-1 py-1 rounded text-xs border border-orange-600 hover:bg-gray-800"
+              title="Save Current Layout"
+            >
+              SAVE
+            </button>
+            <button
+              onClick={() => {
+                if (confirm('Reset layout to default?')) {
+                  localStorage.removeItem('hypertick-layout');
+                  window.location.reload();
+                }
+              }}
+              className="bg-black text-orange-400 px-1 py-1 rounded text-xs border border-orange-600 hover:bg-gray-800"
+              title="Reset to Default Layout"
+            >
+              RESET
+            </button>
           </div>
           
           <button
