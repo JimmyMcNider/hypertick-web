@@ -387,9 +387,9 @@ export class TradingWebSocketServer {
       }
 
       // Determine initial order status based on type
-      let initialStatus: OrderStatus = 'PENDING';
+      let initialStatus: OrderStatus = OrderStatus.PENDING;
       if (orderData.type === 'STOP' || orderData.type === 'STOP_LIMIT') {
-        initialStatus = 'PENDING_TRIGGER'; // Stop orders wait for trigger condition
+        initialStatus = OrderStatus.PENDING_TRIGGER; // Stop orders wait for trigger condition
       }
 
       // Create order in database
