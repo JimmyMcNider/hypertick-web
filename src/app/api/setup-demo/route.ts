@@ -11,7 +11,15 @@ import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
+export async function GET() {
+  return setupDemo();
+}
+
 export async function POST(request: NextRequest) {
+  return setupDemo();
+}
+
+async function setupDemo() {
   try {
     console.log('Starting demo setup...');
 
