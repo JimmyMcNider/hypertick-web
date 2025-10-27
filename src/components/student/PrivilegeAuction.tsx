@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useWebSocketSession } from '@/hooks/useWebSocket';
+import { useWebSocket } from '@/hooks/useWebSocket';
 import { PRIVILEGE_DEFINITIONS } from '@/lib/privilege-system';
 import { sessionManager } from '@/lib/session-manager';
 import { 
@@ -53,7 +53,11 @@ export default function PrivilegeAuction({ sessionId, userId, currentCash }: Pri
   const [userPrivileges, setUserPrivileges] = useState<number[]>([]);
   const [timeRemaining, setTimeRemaining] = useState<Record<string, number>>({});
   
-  const ws = useWebSocketSession(sessionId);
+  const { connected, socket } = useWebSocket({ 
+    sessionId, 
+    userId, 
+    role: 'Student' 
+  });
 
   useEffect(() => {
     loadAuctionData();
@@ -124,8 +128,17 @@ export default function PrivilegeAuction({ sessionId, userId, currentCash }: Pri
       return;
     }
 
+    if (!socket) {
+      alert('Not connected to auction system');
+      return;
+    }
+
     try {
-      await sessionManager.placeBid(sessionId, auctionId, userId, bidAmount);
+      socket.emit('auction_bid', {
+        auctionId,
+        userId,
+        bidAmount
+      });
       loadAuctionData(); // Refresh data after successful bid
     } catch (error) {
       console.error('Failed to place bid:', error);

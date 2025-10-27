@@ -7,6 +7,7 @@
 
 import { EventEmitter } from 'events';
 import { LessonDefinition, LessonCommand, LessonSimulation } from './lesson-loader';
+import { PrivilegeSystem } from './privilege-system';
 
 export interface SessionParticipant {
   id: string;
@@ -61,6 +62,7 @@ export interface ActiveSession {
   executedCommands: Set<string>;
   pendingCommands: LessonCommand[];
   currentLesson: LessonDefinition;
+  privilegeSystem: PrivilegeSystem;
   sessionTimer?: NodeJS.Timeout;
   eventLog: SessionEvent[];
 }
@@ -131,6 +133,7 @@ export class EnhancedSessionEngine extends EventEmitter {
       executedCommands: new Set(),
       pendingCommands: [...simulationData.startCommands, ...simulationData.endCommands],
       currentLesson: lesson,
+      privilegeSystem: new PrivilegeSystem(sessionId, this),
       eventLog: []
     };
 
@@ -284,25 +287,71 @@ export class EnhancedSessionEngine extends EventEmitter {
   /**
    * Grant privilege to participants
    */
-  private async grantPrivilege(session: ActiveSession, params: any): Promise<void> {
-    const { privilegeCode, targetRole, targetUsers } = params;
-
+  private async grantPrivilege(session: ActiveSession, params: any[]): Promise<void> {
+    const privilegeCode = params[0];
+    const targetRole = params.find(p => typeof p === 'string' && p.startsWith('$'));
+    
+    // Determine target users based on role or get all participants
+    const targetUsers: string[] = [];
+    
     for (const participant of session.participants.values()) {
-      const shouldGrant = targetUsers 
-        ? targetUsers.includes(participant.username)
-        : participant.role === targetRole;
-
-      if (shouldGrant) {
-        participant.privileges.add(privilegeCode);
+      let shouldInclude = false;
+      
+      if (targetRole) {
+        // Handle role-based targeting
+        switch (targetRole) {
+          case '$All':
+            shouldInclude = true;
+            break;
+          case '$Students':
+            shouldInclude = participant.role === 'STUDENT';
+            break;
+          case '$Speculators':
+            shouldInclude = participant.role === 'STUDENT';
+            break;
+          case '$Instructors':
+            shouldInclude = participant.role === 'INSTRUCTOR';
+            break;
+          default:
+            shouldInclude = participant.role === 'STUDENT'; // Default to students
+        }
+      } else {
+        // Grant to all if no role specified
+        shouldInclude = true;
+      }
+      
+      if (shouldInclude) {
+        targetUsers.push(participant.id);
+        participant.privileges.add(privilegeCode); // Also add to participant for backward compatibility
       }
     }
 
-    this.emit('privilege_granted', { 
-      sessionId: session.id, 
-      privilegeCode, 
-      targetRole, 
-      targetUsers 
-    });
+    // Use the enhanced privilege system
+    if (targetUsers.length > 0) {
+      try {
+        session.privilegeSystem.grantPrivilege(
+          privilegeCode,
+          targetUsers,
+          'LESSON_SYSTEM'
+        );
+
+        this.emit('privilege_granted', { 
+          sessionId: session.id, 
+          privilegeCode, 
+          targetRole: targetRole || '$All',
+          targetUsers 
+        });
+      } catch (error) {
+        console.warn(`Failed to grant privilege ${privilegeCode}:`, error);
+        // Still emit event for UI update even if privilege system fails
+        this.emit('privilege_granted', { 
+          sessionId: session.id, 
+          privilegeCode, 
+          targetRole: targetRole || '$All',
+          targetUsers 
+        });
+      }
+    }
   }
 
   /**
@@ -361,34 +410,35 @@ export class EnhancedSessionEngine extends EventEmitter {
   }
 
   /**
-   * Create market making auction
+   * Create privilege auction
    */
-  private async createAuction(session: ActiveSession, params: any): Promise<void> {
-    const { symbol, duration, minimumBid, description } = params;
+  private async createAuction(session: ActiveSession, params: any[]): Promise<void> {
+    const privilegeId = params[0] || 22; // Default to Market Making Rights
+    const duration = params[1] || 60; // Default 60 seconds
+    const minimumBid = params[2] || 100; // Default $100
     
-    const endTime = new Date(Date.now() + duration * 1000);
-    const auctionId = `${session.id}_${symbol}_${Date.now()}`;
+    try {
+      const auctionId = session.privilegeSystem.startPrivilegeAuction(
+        privilegeId,
+        minimumBid,
+        duration
+      );
 
-    session.marketState.auctionsActive.set(auctionId, {
-      symbol,
-      endTime,
-      currentBid: minimumBid,
-      minimumBid
-    });
-
-    // Schedule auction end
-    setTimeout(() => {
-      this.endAuction(session.id, auctionId);
-    }, duration * 1000);
-
-    this.logEvent(session, 'AUCTION_STARTED', { symbol, duration, minimumBid });
-    this.emit('auction_started', { 
-      sessionId: session.id, 
-      auctionId, 
-      symbol, 
-      endTime, 
-      minimumBid 
-    });
+      this.logEvent(session, 'AUCTION_STARTED', { privilegeId, duration, minimumBid, auctionId });
+      this.emit('auction_started', { 
+        sessionId: session.id, 
+        auctionId, 
+        privilegeId, 
+        duration,
+        minimumBid 
+      });
+    } catch (error) {
+      console.error('Failed to create privilege auction:', error);
+      this.logEvent(session, 'COMMAND_ERROR', { 
+        error: (error as Error).message,
+        command: 'CREATE_AUCTION' 
+      });
+    }
   }
 
   /**
@@ -598,6 +648,46 @@ export class EnhancedSessionEngine extends EventEmitter {
   }
 
   /**
+   * Get privilege system for a session
+   */
+  getPrivilegeSystem(sessionId: string): any {
+    const session = this.activeSessions.get(sessionId);
+    if (!session) return null;
+
+    return {
+      privilegeMatrix: session.privilegeSystem.getPrivilegeMatrix(),
+      activeAuctions: session.privilegeSystem.getActiveAuctions(),
+      privilegeStats: session.privilegeSystem.getPrivilegeStats()
+    };
+  }
+
+  /**
+   * Place bid in privilege auction
+   */
+  async placeBidInAuction(sessionId: string, auctionId: string, userId: string, bidAmount: number): Promise<boolean> {
+    const session = this.activeSessions.get(sessionId);
+    if (!session) {
+      throw new Error(`Session ${sessionId} not found`);
+    }
+
+    try {
+      const result = session.privilegeSystem.placeBid(auctionId, userId, bidAmount);
+      
+      this.emit('auction_bid_placed', {
+        sessionId,
+        auctionId,
+        userId,
+        bidAmount
+      });
+
+      return result;
+    } catch (error) {
+      console.error('Failed to place auction bid:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Validate command conditions
    */
   private validateCommandConditions(session: ActiveSession, command: LessonCommand): boolean {
@@ -684,10 +774,72 @@ export class EnhancedSessionEngine extends EventEmitter {
   }
 
   /**
-   * Remove privilege stub
+   * Remove privilege from participants
    */
   private async removePrivilege(session: ActiveSession, parameters: any[]): Promise<void> {
-    console.log('Remove privilege command executed:', parameters);
+    const privilegeCode = parameters[0];
+    const targetRole = parameters.find(p => typeof p === 'string' && p.startsWith('$'));
+    
+    // Determine target users based on role
+    const targetUsers: string[] = [];
+    
+    for (const participant of session.participants.values()) {
+      let shouldInclude = false;
+      
+      if (targetRole) {
+        // Handle role-based targeting
+        switch (targetRole) {
+          case '$All':
+            shouldInclude = true;
+            break;
+          case '$Students':
+            shouldInclude = participant.role === 'STUDENT';
+            break;
+          case '$Speculators':
+            shouldInclude = participant.role === 'STUDENT';
+            break;
+          case '$Instructors':
+            shouldInclude = participant.role === 'INSTRUCTOR';
+            break;
+          default:
+            shouldInclude = participant.role === 'STUDENT';
+        }
+      } else {
+        shouldInclude = true;
+      }
+      
+      if (shouldInclude) {
+        targetUsers.push(participant.id);
+        participant.privileges.delete(privilegeCode); // Also remove from participant for backward compatibility
+      }
+    }
+
+    // Use the enhanced privilege system
+    if (targetUsers.length > 0) {
+      try {
+        session.privilegeSystem.revokePrivilege(
+          privilegeCode,
+          targetUsers,
+          'LESSON_SYSTEM'
+        );
+
+        this.emit('privilege_revoked', { 
+          sessionId: session.id, 
+          privilegeCode, 
+          targetRole: targetRole || '$All',
+          targetUsers 
+        });
+      } catch (error) {
+        console.warn(`Failed to revoke privilege ${privilegeCode}:`, error);
+        // Still emit event for UI update
+        this.emit('privilege_revoked', { 
+          sessionId: session.id, 
+          privilegeCode, 
+          targetRole: targetRole || '$All',
+          targetUsers 
+        });
+      }
+    }
   }
 
   /**

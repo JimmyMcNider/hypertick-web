@@ -55,136 +55,89 @@ export interface PrivilegeBid {
   timestamp: Date;
 }
 
-// Legacy upTick privilege definitions mapped to modern system
-export const PRIVILEGE_DEFINITIONS: Record<number, PrivilegeDefinition> = {
-  1: {
-    id: 1,
-    name: 'Market Orders',
-    description: 'Ability to place market orders',
-    category: 'TRADING',
-    defaultGranted: true,
-    auctionable: false
-  },
-  2: {
-    id: 2,
-    name: 'Limit Orders',
-    description: 'Ability to place limit orders',
-    category: 'TRADING',
-    defaultGranted: true,
-    auctionable: false
-  },
-  3: {
-    id: 3,
-    name: 'Short Selling',
-    description: 'Ability to sell short',
-    category: 'TRADING',
-    defaultGranted: false,
-    auctionable: true
-  },
-  4: {
-    id: 4,
-    name: 'Margin Trading',
-    description: 'Ability to trade on margin',
-    category: 'TRADING',
-    defaultGranted: false,
-    auctionable: true
-  },
-  5: {
-    id: 5,
-    name: 'Market Making',
-    description: 'Ability to provide liquidity and earn spreads',
-    category: 'MARKET_MAKING',
-    defaultGranted: false,
-    auctionable: true,
-    maxHolders: 3
-  },
-  6: {
-    id: 6,
-    name: 'Specialist Privileges',
-    description: 'Designated market maker with special obligations',
-    category: 'MARKET_MAKING',
-    defaultGranted: false,
-    auctionable: true,
-    maxHolders: 1,
-    prerequisites: [5]
-  },
-  7: {
-    id: 7,
-    name: 'News Access',
-    description: 'Access to real-time market news',
-    category: 'INFORMATION',
-    defaultGranted: true,
-    auctionable: false
-  },
-  8: {
-    id: 8,
-    name: 'Research Reports',
-    description: 'Access to analyst research and recommendations',
-    category: 'INFORMATION',
-    defaultGranted: false,
-    auctionable: true
-  },
-  9: {
-    id: 9,
-    name: 'Level II Data',
-    description: 'Access to order book depth (Montage)',
-    category: 'INFORMATION',
-    defaultGranted: false,
-    auctionable: true
-  },
-  10: {
-    id: 10,
-    name: 'Private Information',
-    description: 'Access to privileged insider information',
-    category: 'INFORMATION',
-    defaultGranted: false,
-    auctionable: true,
-    maxHolders: 2
-  },
-  11: {
-    id: 11,
-    name: 'Portfolio Analytics',
-    description: 'Advanced portfolio analysis tools',
-    category: 'ANALYSIS',
-    defaultGranted: false,
-    auctionable: true
-  },
-  12: {
-    id: 12,
-    name: 'Risk Management',
-    description: 'Access to risk monitoring and alerts',
-    category: 'ANALYSIS',
-    defaultGranted: false,
-    auctionable: true
-  },
-  13: {
-    id: 13,
-    name: 'Options Trading',
-    description: 'Ability to trade options contracts',
-    category: 'TRADING',
-    defaultGranted: false,
-    auctionable: true,
-    prerequisites: [2]
-  },
-  14: {
-    id: 14,
-    name: 'Futures Trading',
-    description: 'Ability to trade futures contracts',
-    category: 'TRADING',
-    defaultGranted: false,
-    auctionable: true,
-    prerequisites: [4]
-  },
-  15: {
-    id: 15,
-    name: 'Block Trading',
-    description: 'Ability to execute large block trades',
-    category: 'TRADING',
-    defaultGranted: false,
-    auctionable: true,
-    maxHolders: 5
+import { PRIVILEGE_DEFINITIONS as LEGACY_PRIVILEGE_DEFINITIONS, getPrivilegeByCode } from './privilege-definitions';
+
+// Enhanced privilege definitions mapped from legacy upTick system
+export const PRIVILEGE_DEFINITIONS: Record<number, PrivilegeDefinition> = {};
+
+// Initialize privilege definitions from the comprehensive definitions file
+LEGACY_PRIVILEGE_DEFINITIONS.forEach(legacyPriv => {
+  const category = mapLegacyCategory(legacyPriv.category);
+  
+  PRIVILEGE_DEFINITIONS[legacyPriv.code] = {
+    id: legacyPriv.code,
+    name: legacyPriv.name,
+    description: legacyPriv.description,
+    category,
+    defaultGranted: getDefaultGrantedStatus(legacyPriv.code),
+    auctionable: getAuctionableStatus(legacyPriv.code),
+    maxHolders: getMaxHolders(legacyPriv.code),
+    prerequisites: getPrerequisites(legacyPriv.code),
+    mutuallyExclusive: getMutuallyExclusive(legacyPriv.code)
+  };
+});
+
+function mapLegacyCategory(category: string): 'TRADING' | 'MARKET_MAKING' | 'INFORMATION' | 'ANALYSIS' | 'ADMIN' {
+  switch (category) {
+    case 'trading': return 'TRADING';
+    case 'market_data': return 'INFORMATION';
+    case 'analysis': return 'ANALYSIS';
+    case 'admin': return 'ADMIN';
+    case 'utility': return 'ADMIN';
+    default: return 'TRADING';
   }
-};
+}
+
+function getDefaultGrantedStatus(privilegeId: number): boolean {
+  // Basic student privileges that are granted by default
+  const defaultPrivileges = [1, 4, 5, 11, 13, 15, 33];
+  return defaultPrivileges.includes(privilegeId);
+}
+
+function getAuctionableStatus(privilegeId: number): boolean {
+  // Privileges that can be auctioned for (high-value trading rights)
+  const auctionablePrivileges = [9, 22, 23, 25, 26, 27, 28, 29, 32];
+  return auctionablePrivileges.includes(privilegeId);
+}
+
+function getMaxHolders(privilegeId: number): number | undefined {
+  // Limited holder privileges
+  const limitedPrivileges: Record<number, number> = {
+    22: 3, // Market Making Rights - max 3 students
+    23: 2, // Premium Analyst Signals - max 2 students
+    25: 5, // Block Trading - max 5 students
+    27: 2, // Dark Pool Access - max 2 students
+    32: 1, // Auction Window - instructor only
+    35: 1  // Instructor Controls - instructor only
+  };
+  return limitedPrivileges[privilegeId];
+}
+
+function getPrerequisites(privilegeId: number): number[] | undefined {
+  // Privilege prerequisites 
+  const prerequisites: Record<number, number[]> = {
+    16: [9], // Options Chain requires Montage
+    22: [8], // Market Making requires Market Order Window
+    23: [1], // Premium Analyst requires Analyst Window
+    24: [22], // Spread Trading requires Market Making Rights
+    25: [22], // Block Trading requires Market Making Rights
+    26: [22], // Algorithmic Orders require Market Making Rights
+    27: [22], // Dark Pool Access requires Market Making Rights
+    28: [22], // Cross Trading requires Market Making Rights
+    29: [8], // Bump Buttons require Market Order Window
+    35: [30] // Instructor Controls require Compliance Monitor
+  };
+  return prerequisites[privilegeId];
+}
+
+function getMutuallyExclusive(privilegeId: number): number[] | undefined {
+  // Mutually exclusive privileges (can't have both)
+  const mutuallyExclusive: Record<number, number[]> = {
+    22: [23], // Market Making vs Premium Analyst (different roles)
+    23: [22]  // Premium Analyst vs Market Making
+  };
+  return mutuallyExclusive[privilegeId];
+}
 
 export class PrivilegeSystem {
   private userPrivileges: Map<string, Map<number, UserPrivilege>> = new Map();

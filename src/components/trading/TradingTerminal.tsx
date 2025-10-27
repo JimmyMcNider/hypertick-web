@@ -32,10 +32,12 @@ interface Order {
   id: string;
   symbol: string;
   side: 'BUY' | 'SELL';
-  type: 'MARKET' | 'LIMIT';
+  type: 'MARKET' | 'LIMIT' | 'STOP' | 'STOP_LIMIT';
   quantity: number;
   price?: number;
-  status: string;
+  stopPrice?: number;
+  status: 'PENDING' | 'PENDING_TRIGGER' | 'PARTIALLY_FILLED' | 'FILLED' | 'CANCELLED' | 'REJECTED';
+  timeInForce: 'GTC' | 'IOC' | 'FOK' | 'DAY';
   timestamp: Date;
 }
 
@@ -46,6 +48,22 @@ interface Position {
   marketValue: number;
   unrealizedPnL: number;
   realizedPnL: number;
+  dayPnL: number;
+  marketPrice: number;
+  totalCost: number;
+  lastUpdated: Date;
+}
+
+interface Portfolio {
+  totalEquity: number;
+  totalCash: number;
+  totalValue: number;
+  dayPnL: number;
+  totalPnL: number;
+  positions: Position[];
+  buying_power: number;
+  margin_used: number;
+  risk_level: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 }
 
 interface TradingTerminalProps {
@@ -63,26 +81,58 @@ const TradingTerminal: React.FC<TradingTerminalProps> = ({ sessionId, userId, ro
     trades, 
     submitOrder, 
     error, 
-    clearError 
+    clearError,
+    socket
   } = useWebSocket({ sessionId, userId, role });
 
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
+  const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [selectedSymbol, setSelectedSymbol] = useState('AOE');
   const [orderForm, setOrderForm] = useState({
     symbol: 'AOE',
     side: 'BUY' as 'BUY' | 'SELL',
-    type: 'MARKET' as 'MARKET' | 'LIMIT',
+    type: 'MARKET' as 'MARKET' | 'LIMIT' | 'STOP' | 'STOP_LIMIT',
     quantity: 100,
-    price: undefined as number | undefined
+    price: undefined as number | undefined,
+    stopPrice: undefined as number | undefined,
+    timeInForce: 'GTC' as 'GTC' | 'IOC' | 'FOK' | 'DAY'
   });
 
   const watchlistSymbols = ['AOE', 'PNR', 'VGR', 'BOND1', 'BOND2'];
 
-  // Update active orders and positions when new data comes from WebSocket
+  // Update active orders when new data comes from WebSocket
   useEffect(() => {
     setActiveOrders(orders);
   }, [orders]);
+
+  // Set up portfolio and position listeners
+  useEffect(() => {
+    if (socket) {
+      const handlePortfolioUpdate = (portfolioData: Portfolio) => {
+        setPortfolio(portfolioData);
+        setPositions(portfolioData.positions);
+      };
+
+      const handlePositionUpdate = (data: { symbol: string; position: Position }) => {
+        setPositions(prev => {
+          const updated = prev.filter(p => p.symbol !== data.symbol);
+          if (data.position.quantity !== 0) {
+            updated.push(data.position);
+          }
+          return updated;
+        });
+      };
+
+      socket.on('portfolio_update', handlePortfolioUpdate);
+      socket.on('position_update', handlePositionUpdate);
+
+      return () => {
+        socket.off('portfolio_update', handlePortfolioUpdate);
+        socket.off('position_update', handlePositionUpdate);
+      };
+    }
+  }, [socket]);
 
   // Convert market data array to map for easier access
   const marketDataMap = new Map(marketData.map(md => [md.symbol, {
@@ -108,8 +158,9 @@ const TradingTerminal: React.FC<TradingTerminalProps> = ({ sessionId, userId, ro
       side: orderForm.side,
       type: orderForm.type,
       quantity: orderForm.quantity,
-      price: orderForm.type !== 'MARKET' ? orderForm.price : undefined,
-      timeInForce: 'GTC' as 'GTC' | 'IOC' | 'FOK'
+      price: (orderForm.type === 'LIMIT' || orderForm.type === 'STOP_LIMIT') ? orderForm.price : undefined,
+      stopPrice: (orderForm.type === 'STOP' || orderForm.type === 'STOP_LIMIT') ? orderForm.stopPrice : undefined,
+      timeInForce: orderForm.timeInForce
     };
 
     submitOrder(orderData);
@@ -118,7 +169,8 @@ const TradingTerminal: React.FC<TradingTerminalProps> = ({ sessionId, userId, ro
     setOrderForm(prev => ({
       ...prev,
       quantity: 100,
-      price: undefined
+      price: undefined,
+      stopPrice: undefined
     }));
   };
 
@@ -304,7 +356,8 @@ const TradingTerminal: React.FC<TradingTerminalProps> = ({ sessionId, userId, ro
               >
                 <option value="MARKET">Market</option>
                 <option value="LIMIT">Limit</option>
-                <option value="STOP">Stop</option>
+                <option value="STOP">Stop Loss</option>
+                <option value="STOP_LIMIT">Stop Limit</option>
               </select>
             </div>
 
@@ -318,25 +371,67 @@ const TradingTerminal: React.FC<TradingTerminalProps> = ({ sessionId, userId, ro
               />
             </div>
 
-            {orderForm.type !== 'MARKET' && (
+            {/* Stop Price Field - for STOP and STOP_LIMIT orders */}
+            {(orderForm.type === 'STOP' || orderForm.type === 'STOP_LIMIT') && (
               <div>
-                <label className="block text-sm font-medium mb-1">Price</label>
+                <label className="block text-sm font-medium mb-1">
+                  Stop Price {orderForm.side === 'SELL' ? '(trigger below)' : '(trigger above)'}
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={orderForm.stopPrice || ''}
+                  onChange={(e) => setOrderForm(prev => ({ ...prev, stopPrice: parseFloat(e.target.value) || undefined }))}
+                  className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2"
+                  placeholder={selectedMarketData ? formatPrice(selectedMarketData.last) : '100.00'}
+                />
+              </div>
+            )}
+
+            {/* Limit Price Field - for LIMIT and STOP_LIMIT orders */}
+            {(orderForm.type === 'LIMIT' || orderForm.type === 'STOP_LIMIT') && (
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  {orderForm.type === 'STOP_LIMIT' ? 'Limit Price' : 'Price'}
+                </label>
                 <input
                   type="number"
                   step="0.01"
                   value={orderForm.price || ''}
                   onChange={(e) => setOrderForm(prev => ({ ...prev, price: parseFloat(e.target.value) || undefined }))}
                   className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2"
+                  placeholder={selectedMarketData ? formatPrice(selectedMarketData.last) : '100.00'}
                 />
               </div>
             )}
 
+            {/* Time-in-Force Field */}
+            <div>
+              <label className="block text-sm font-medium mb-1">Time in Force</label>
+              <select
+                value={orderForm.timeInForce}
+                onChange={(e) => setOrderForm(prev => ({ ...prev, timeInForce: e.target.value as any }))}
+                className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2"
+              >
+                <option value="GTC">Good Till Cancel</option>
+                <option value="DAY">Day Order</option>
+                <option value="IOC">Immediate or Cancel</option>
+                <option value="FOK">Fill or Kill</option>
+              </select>
+            </div>
+
             <button
               onClick={handlePlaceOrder}
-              disabled={!connected}
+              disabled={
+                !connected || 
+                orderForm.quantity <= 0 ||
+                (orderForm.type === 'LIMIT' && !orderForm.price) ||
+                (orderForm.type === 'STOP' && !orderForm.stopPrice) ||
+                (orderForm.type === 'STOP_LIMIT' && (!orderForm.price || !orderForm.stopPrice))
+              }
               className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 py-2 rounded font-semibold"
             >
-              Place Order
+              Place {orderForm.type} Order
             </button>
           </div>
         </div>
@@ -352,18 +447,38 @@ const TradingTerminal: React.FC<TradingTerminalProps> = ({ sessionId, userId, ro
             <div className="space-y-2">
               {activeOrders.map(order => (
                 <div key={order.id} className="flex justify-between items-center p-2 bg-gray-700 rounded">
-                  <div>
-                    <div className="font-medium">{order.symbol} {order.side}</div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{order.symbol} {order.side}</span>
+                      <span className={`px-2 py-1 text-xs rounded ${
+                        order.status === 'FILLED' ? 'bg-green-600' :
+                        order.status === 'PENDING_TRIGGER' ? 'bg-yellow-600' :
+                        order.status === 'PENDING' ? 'bg-blue-600' :
+                        'bg-gray-600'
+                      }`}>
+                        {order.status.replace('_', ' ')}
+                      </span>
+                    </div>
                     <div className="text-sm text-gray-400">
-                      {order.type} • {order.quantity} @ {order.price ? formatPrice(order.price) : 'Market'}
+                      {order.type} • {order.quantity} shares
+                      {order.type === 'LIMIT' && order.price && ` @ ${formatPrice(order.price)}`}
+                      {order.type === 'MARKET' && ' @ Market'}
+                      {order.type === 'STOP' && order.stopPrice && ` • Stop: ${formatPrice(order.stopPrice)}`}
+                      {order.type === 'STOP_LIMIT' && order.stopPrice && order.price && 
+                        ` • Stop: ${formatPrice(order.stopPrice)} • Limit: ${formatPrice(order.price)}`}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {order.timeInForce} • {new Date(order.timestamp).toLocaleTimeString()}
                     </div>
                   </div>
-                  <button
-                    onClick={() => handleCancelOrder(order.id)}
-                    className="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-sm"
-                  >
-                    Cancel
-                  </button>
+                  {order.status === 'PENDING' || order.status === 'PENDING_TRIGGER' ? (
+                    <button
+                      onClick={() => handleCancelOrder(order.id)}
+                      className="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-sm"
+                    >
+                      Cancel
+                    </button>
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -372,27 +487,98 @@ const TradingTerminal: React.FC<TradingTerminalProps> = ({ sessionId, userId, ro
 
         {/* Positions */}
         <div className="bg-gray-800 rounded p-4">
-          <h3 className="text-lg font-semibold mb-3">Positions</h3>
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="text-lg font-semibold">Positions</h3>
+            {portfolio && (
+              <div className="text-right">
+                <div className="text-sm text-gray-400">Total P&L</div>
+                <div className={`font-bold ${
+                  portfolio.totalPnL >= 0 ? 'text-green-400' : 'text-red-400'
+                }`}>
+                  {portfolio.totalPnL >= 0 ? '+' : ''}${formatPrice(portfolio.totalPnL)}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Portfolio Summary */}
+          {portfolio && (
+            <div className="mb-4 p-3 bg-gray-700 rounded">
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <span className="text-gray-400">Total Value:</span>
+                  <span className="ml-2 font-bold">${formatPrice(portfolio.totalValue)}</span>
+                </div>
+                <div>
+                  <span className="text-gray-400">Cash:</span>
+                  <span className="ml-2 font-bold">${formatPrice(portfolio.totalCash)}</span>
+                </div>
+                <div>
+                  <span className="text-gray-400">Buying Power:</span>
+                  <span className="ml-2 font-bold">${formatPrice(portfolio.buying_power)}</span>
+                </div>
+                <div>
+                  <span className="text-gray-400">Risk Level:</span>
+                  <span className={`ml-2 font-bold ${
+                    portfolio.risk_level === 'LOW' ? 'text-green-400' :
+                    portfolio.risk_level === 'MEDIUM' ? 'text-yellow-400' :
+                    portfolio.risk_level === 'HIGH' ? 'text-orange-400' :
+                    'text-red-400'
+                  }`}>
+                    {portfolio.risk_level}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {positions.length === 0 ? (
             <p className="text-gray-400">No positions</p>
           ) : (
             <div className="space-y-2">
               {positions.map(position => (
-                <div key={position.symbol} className="p-2 bg-gray-700 rounded">
-                  <div className="flex justify-between items-center">
-                    <span className="font-medium">{position.symbol}</span>
-                    <span className={`font-semibold ${
-                      position.unrealizedPnL >= 0 ? 'text-green-400' : 'text-red-400'
-                    }`}>
-                      {position.unrealizedPnL >= 0 ? '+' : ''}{formatPrice(position.unrealizedPnL)}
-                    </span>
+                <div key={position.symbol} className="p-3 bg-gray-700 rounded">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="font-medium text-blue-400">{position.symbol}</span>
+                    <div className="text-right">
+                      <div className={`font-semibold ${
+                        position.unrealizedPnL >= 0 ? 'text-green-400' : 'text-red-400'
+                      }`}>
+                        {position.unrealizedPnL >= 0 ? '+' : ''}${formatPrice(position.unrealizedPnL)}
+                      </div>
+                      <div className="text-xs text-gray-400">Unrealized</div>
+                    </div>
                   </div>
-                  <div className="text-sm text-gray-400">
-                    {position.quantity} shares @ {formatPrice(position.avgPrice)}
+                  
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <span className="text-gray-400">Qty:</span>
+                      <span className="ml-1 font-medium">{position.quantity}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Avg Price:</span>
+                      <span className="ml-1 font-medium">${formatPrice(position.avgPrice)}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Market Price:</span>
+                      <span className="ml-1 font-medium">${formatPrice(position.marketPrice)}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Market Value:</span>
+                      <span className="ml-1 font-medium">${formatPrice(position.marketValue)}</span>
+                    </div>
                   </div>
-                  <div className="text-sm text-gray-400">
-                    Market Value: {formatPrice(position.marketValue)}
-                  </div>
+
+                  {position.realizedPnL !== 0 && (
+                    <div className="mt-2 pt-2 border-t border-gray-600">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-400">Realized P&L:</span>
+                        <span className={position.realizedPnL >= 0 ? 'text-green-400' : 'text-red-400'}>
+                          {position.realizedPnL >= 0 ? '+' : ''}${formatPrice(position.realizedPnL)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

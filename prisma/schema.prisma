@@ -192,8 +192,10 @@ model Order {
   side         OrderSide
   quantity     Int
   price        Decimal?
+  stopPrice    Decimal?   // For stop and stop-limit orders
   status       OrderStatus @default(PENDING)
   timeInForce  String     @default("DAY")
+  notes        String?    // For tracking triggers, etc.
   submittedAt  DateTime   @default(now())
   executedAt   DateTime?
   cancelledAt  DateTime?
@@ -221,6 +223,7 @@ enum OrderSide {
 
 enum OrderStatus {
   PENDING
+  PENDING_TRIGGER  // For stop orders waiting for trigger condition
   PARTIALLY_FILLED
   FILLED
   CANCELLED

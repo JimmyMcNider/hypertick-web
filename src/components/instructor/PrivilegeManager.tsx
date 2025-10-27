@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-// import { useWebSocketInstructor } from '@/hooks/useWebSocket';
+import { useWebSocket } from '@/hooks/useWebSocket';
 import { PRIVILEGE_DEFINITIONS } from '@/lib/privilege-system';
 import { sessionManager } from '@/lib/session-manager';
 import { 
@@ -55,7 +55,12 @@ export default function PrivilegeManager({ sessionId, participants }: PrivilegeM
   const [auctionMinBid, setAuctionMinBid] = useState(100);
   const [auctionDuration, setAuctionDuration] = useState(300); // 5 minutes
   
-  // const ws = useWebSocketInstructor();
+  // Use WebSocket for real-time privilege management
+  const { connected, socket } = useWebSocket({ 
+    sessionId, 
+    userId: 'instructor', // This would come from auth context in real implementation
+    role: 'Instructor' 
+  });
 
   useEffect(() => {
     // Load initial privilege data
@@ -85,10 +90,11 @@ export default function PrivilegeManager({ sessionId, participants }: PrivilegeM
   };
 
   const handleGrantPrivilege = async () => {
-    if (!selectedPrivilege) return;
+    if (!selectedPrivilege || !socket) return;
 
     try {
-      // await // ws.executeCommand('GRANT_PRIVILEGE', {
+      socket.emit('privilege_command', {
+        action: 'GRANT_PRIVILEGE',
         privilegeId: selectedPrivilege,
         targetRole: selectedTargetRole
       });
@@ -100,10 +106,11 @@ export default function PrivilegeManager({ sessionId, participants }: PrivilegeM
   };
 
   const handleRevokePrivilege = async () => {
-    if (!selectedPrivilege) return;
+    if (!selectedPrivilege || !socket) return;
 
     try {
-      // await // ws.executeCommand('REMOVE_PRIVILEGE', {
+      socket.emit('privilege_command', {
+        action: 'REMOVE_PRIVILEGE',
         privilegeId: selectedPrivilege,
         targetRole: selectedTargetRole
       });
@@ -124,13 +131,16 @@ export default function PrivilegeManager({ sessionId, participants }: PrivilegeM
     }
 
     try {
-      // await // ws.executeCommand('CREATE_AUCTION', {
-        privilegeId: selectedPrivilege,
-        minBid: auctionMinBid,
-        duration: auctionDuration
-      });
-      
-      loadPrivilegeData();
+      if (socket) {
+        socket.emit('privilege_command', {
+          action: 'CREATE_AUCTION',
+          privilegeId: selectedPrivilege,
+          minBid: auctionMinBid,
+          duration: auctionDuration
+        });
+        
+        loadPrivilegeData();
+      }
     } catch (error) {
       console.error('Failed to start auction:', error);
     }

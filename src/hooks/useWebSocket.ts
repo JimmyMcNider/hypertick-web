@@ -126,6 +126,35 @@ export const useWebSocket = ({ sessionId, userId, role }: WebSocketHookProps) =>
       // Handle market open/close events
     });
 
+    // Stop order triggering handler
+    currentSocket.on('stop_order_triggered', (data: { orderId: string; triggerPrice: number; trades: any[] }) => {
+      console.log('Stop order triggered:', data);
+      setState(prev => ({ 
+        ...prev, 
+        trades: [...data.trades, ...prev.trades.slice(0, 49)],
+        error: `Stop order triggered at $${data.triggerPrice.toFixed(2)}`
+      }));
+    });
+
+    // Portfolio and position handlers
+    currentSocket.on('portfolio_update', (portfolio: any) => {
+      console.log('Portfolio updated:', portfolio);
+      // This will be handled by the trading terminal component
+    });
+
+    currentSocket.on('position_update', (data: { symbol: string; position: any }) => {
+      console.log('Position updated:', data);
+      // This will be handled by the trading terminal component
+    });
+
+    currentSocket.on('trade_executed', (trade: any) => {
+      console.log('Trade executed:', trade);
+      setState(prev => ({ 
+        ...prev, 
+        trades: [trade, ...prev.trades.slice(0, 49)]
+      }));
+    });
+
     currentSocket.on('error', (error: { message: string }) => {
       console.error('WebSocket error:', error.message);
       setState(prev => ({ ...prev, error: error.message }));

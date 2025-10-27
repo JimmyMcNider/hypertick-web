@@ -10,6 +10,7 @@ import LessonManager from '@/components/instructor/LessonManager';
 import AnalyticsDashboard from '@/components/instructor/AnalyticsDashboard';
 import LessonAuthor from '@/components/instructor/LessonAuthor';
 import StudentManagement from '@/components/instructor/StudentManagement';
+import SessionControlDashboard from '@/components/instructor/SessionControlDashboard';
 import LiveSessionControl from '@/components/instructor/LiveSessionControl';
 import SimulationControl from '@/components/instructor/SimulationControl';
 
@@ -35,7 +36,7 @@ export default function InstructorPage() {
   const [user, setUser] = useState<User | null>(null);
   const [classes, setClasses] = useState<Class[]>([]);
   const [selectedClass, setSelectedClass] = useState<string>('');
-  const [selectedTab, setSelectedTab] = useState<'lessons' | 'analytics' | 'author' | 'students' | 'live'>('lessons');
+  const [selectedTab, setSelectedTab] = useState<'lessons' | 'analytics' | 'author' | 'students' | 'live'>('live');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const router = useRouter();
@@ -277,7 +278,7 @@ export default function InstructorPage() {
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     }`}
                   >
-                    Live Session
+                    🎯 Session Control
                   </button>
                   <button
                     onClick={() => setSelectedTab('author')}
@@ -317,13 +318,10 @@ export default function InstructorPage() {
             )}
             
             {selectedTab === 'live' && (
-              <div className="p-6">
-                {/* Import new SimulationControl */}
-                <SimulationControl 
-                  classId={selectedClass}
-                  userId={user?.id || ''}
-                />
-              </div>
+              <SessionControlDashboard
+                user={user}
+                classId={selectedClass}
+              />
             )}
             
             {selectedTab === 'author' && (
