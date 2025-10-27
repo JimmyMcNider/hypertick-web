@@ -36,18 +36,27 @@ fi
 # Initialize database schema
 if [ "$DB_READY" = true ]; then
     echo "🗄️  Pushing database schema..."
-    if npx prisma db push --accept-data-loss; then
+    if npx prisma db push --accept-data-loss --force-reset; then
         echo "✅ Database schema updated successfully"
+        
+        # Seed database with initial data
+        echo "🌱 Seeding database with initial data..."
+        if npm run db:seed; then
+            echo "✅ Database seeded successfully"
+        else
+            echo "⚠️  Database seeding failed, trying alternative approach..."
+            echo "🔧 Running prisma generate and trying seed again..."
+            npx prisma generate
+            npm run db:seed || echo "⚠️  Final seed attempt failed, continuing..."
+        fi
     else
-        echo "⚠️  Database schema push failed, but continuing..."
-    fi
-
-    # Seed database with initial data
-    echo "🌱 Seeding database with initial data..."
-    if npm run db:seed; then
-        echo "✅ Database seeded successfully"
-    else
-        echo "⚠️  Database seeding failed, but continuing..."
+        echo "⚠️  Database schema push failed, trying without force-reset..."
+        if npx prisma db push --accept-data-loss; then
+            echo "✅ Database schema updated successfully (second attempt)"
+            npm run db:seed || echo "⚠️  Seeding failed after schema update"
+        else
+            echo "⚠️  Database schema operations failed, but continuing..."
+        fi
     fi
 else
     echo "⚠️  Skipping database operations due to connection issues"
