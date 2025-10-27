@@ -12,7 +12,8 @@ export async function GET() {
       status: 'healthy',
       timestamp: new Date().toISOString(),
       database: 'connected',
-      service: 'hypertick-web'
+      service: 'hypertick-web',
+      version: 'v2.1.0-demo-setup'
     });
   } catch (error) {
     return NextResponse.json({
