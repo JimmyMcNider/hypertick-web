@@ -93,12 +93,29 @@ export default function StudentManagement({ user, classId }: StudentManagementPr
       });
 
       if (response.ok) {
+        const result = await response.json();
         await fetchStudents();
         setNewStudent({ firstName: '', lastName: '', email: '', username: '' });
         setShowAddModal(false);
+        
+        // Show success message with details
+        if (result.imported && result.total) {
+          alert(`Success! Added ${result.imported} student(s). ${result.skipped ? `Skipped ${result.skipped} (already enrolled).` : ''}`);
+        }
       } else {
         const error = await response.json();
-        alert('Error adding student: ' + error.error);
+        console.error('Student addition error:', error);
+        
+        // Show detailed error message
+        let errorMessage = error.error || 'Unknown error occurred';
+        if (error.debug) {
+          console.log('Debug info:', error.debug);
+          if (error.debug.classInstructor) {
+            errorMessage += `\n\nNote: This class belongs to ${error.debug.classInstructor}. Make sure you're logged in as the correct instructor.`;
+          }
+        }
+        
+        alert('Error adding student: ' + errorMessage);
       }
     } catch (error) {
       alert('Error adding student: ' + (error instanceof Error ? error.message : String(error)));
@@ -139,10 +156,30 @@ export default function StudentManagement({ user, classId }: StudentManagementPr
         await fetchStudents();
         setImportData('');
         setShowImportModal(false);
-        alert(`Successfully imported ${result.imported} students (${result.skipped} skipped)`);
+        
+        // Show detailed success message
+        let successMessage = `Successfully imported ${result.imported} students`;
+        if (result.skipped > 0) {
+          successMessage += ` (${result.skipped} skipped - already enrolled)`;
+        }
+        if (result.fallback) {
+          successMessage += '\n\nNote: Running in demo mode - students added to memory only.';
+        }
+        alert(successMessage);
       } else {
         const error = await response.json();
-        alert('Error importing students: ' + error.error);
+        console.error('Bulk import error:', error);
+        
+        // Show detailed error message
+        let errorMessage = error.error || 'Unknown error occurred';
+        if (error.debug) {
+          console.log('Debug info:', error.debug);
+          if (error.debug.classInstructor) {
+            errorMessage += `\n\nNote: This class belongs to ${error.debug.classInstructor}. Make sure you're logged in as the correct instructor.`;
+          }
+        }
+        
+        alert('Error importing students: ' + errorMessage);
       }
     } catch (error) {
       alert('Error parsing import data: ' + (error instanceof Error ? error.message : String(error)));

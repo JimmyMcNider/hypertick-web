@@ -13,6 +13,7 @@ import StudentManagement from '@/components/instructor/StudentManagement';
 import SessionControlDashboard from '@/components/instructor/SessionControlDashboard';
 import LiveSessionControl from '@/components/instructor/LiveSessionControl';
 import SimulationControl from '@/components/instructor/SimulationControl';
+import InstructorOnboarding from '@/components/instructor/InstructorOnboarding';
 
 interface User {
   id: string;
@@ -40,6 +41,7 @@ export default function InstructorPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [lessonCount, setLessonCount] = useState(0);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -124,6 +126,12 @@ export default function InstructorPage() {
         }
       }
 
+      // Check if user needs onboarding
+      const hasCompletedOnboarding = localStorage.getItem('hypertick_onboarding_completed');
+      if (!hasCompletedOnboarding && userData.user.role === 'INSTRUCTOR') {
+        setShowOnboarding(true);
+      }
+
       // Load lesson count
       const lessonsResponse = await fetch('/api/lessons', {
         headers: {
@@ -186,8 +194,25 @@ export default function InstructorPage() {
     );
   }
 
+  const handleOnboardingComplete = () => {
+    setShowOnboarding(false);
+  };
+
+  const handleOnboardingSkip = () => {
+    setShowOnboarding(false);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Onboarding Modal */}
+      {showOnboarding && (
+        <InstructorOnboarding
+          user={user}
+          onComplete={handleOnboardingComplete}
+          onSkip={handleOnboardingSkip}
+        />
+      )}
+
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
