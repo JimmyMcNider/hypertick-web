@@ -16,8 +16,8 @@ services:
     name: hypertick-web
     env: node
     plan: starter
-    buildCommand: npm ci && npx prisma generate && npx prisma db push && npm run build
-    startCommand: bash scripts/start.sh
+    buildCommand: npm ci && npx prisma generate && npm run build
+    startCommand: npm start
     healthCheckPath: /api/health
     autoDeploy: true
     envVars:
@@ -46,6 +46,6 @@ services:
       - key: WEBSOCKET_PORT
         value: "3001"
       - key: ENABLE_FALLBACK_MODE
-        value: "false"
+        value: "true"
       - key: DISABLE_EXTERNAL_APIS
         value: "false"

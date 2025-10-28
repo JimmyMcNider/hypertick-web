@@ -30,7 +30,8 @@ done
 
 if [ "$DB_READY" = false ]; then
     echo "❌ Failed to connect to database after 180 seconds"
-    echo "🔧 Attempting to start application anyway (some features may be limited)"
+    echo "🔧 Enabling fallback mode for database-free operation"
+    export ENABLE_FALLBACK_MODE=true
 fi
 
 # Initialize database schema

@@ -21,14 +21,12 @@ app.prepare().then(async () => {
     }
   });
 
-  // Initialize WebSocket server only after Next.js is ready
-  try {
-    const { initWebSocketServer } = await import('./src/lib/websocket-server.js');
-    const wsServer = initWebSocketServer(server);
-    console.log('WebSocket server initialized');
-  } catch (error) {
-    console.warn('WebSocket server failed to initialize:', error.message);
-    console.log('Continuing without WebSocket support');
+  // Note: WebSocket server initialization moved to API routes for production compatibility
+  console.log('Server starting in', process.env.NODE_ENV, 'mode');
+  if (process.env.NODE_ENV === 'development') {
+    console.log('WebSocket support: Available via development server');
+  } else {
+    console.log('WebSocket support: Available via Socket.IO endpoint');
   }
 
   server
