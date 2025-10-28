@@ -109,6 +109,8 @@ export const POST = requireAuth(async (request: NextRequest & { user: any }, { p
 
     // Try database operation first, fall back on error
     try {
+      console.log(`🔍 Checking class access for user ${request.user.id} (${request.user.username}, role: ${request.user.role}) on class ${classId}`);
+      
       // Verify user has access to this class
       const classAccess = await prisma.class.findUnique({
         where: {
@@ -117,8 +119,39 @@ export const POST = requireAuth(async (request: NextRequest & { user: any }, { p
         }
       });
 
+      console.log(`📋 Class access result:`, {
+        classExists: !!classAccess,
+        classId: classAccess?.id,
+        instructorId: classAccess?.instructorId,
+        userRole: request.user.role,
+        userId: request.user.id
+      });
+
       if (!classAccess && request.user.role !== 'ADMIN') {
-        return NextResponse.json({ error: 'Access denied to class' }, { status: 403 });
+        // Check if class exists at all to provide better error
+        const classExists = await prisma.class.findUnique({
+          where: { id: classId },
+          include: { instructor: { select: { username: true } } }
+        });
+
+        if (!classExists) {
+          console.log(`❌ Class ${classId} not found in database`);
+          return NextResponse.json({ 
+            error: 'Class not found',
+            debug: { classId, requestedBy: request.user.username }
+          }, { status: 404 });
+        } else {
+          console.log(`❌ User ${request.user.username} (${request.user.id}) not authorized for class ${classId} owned by ${classExists.instructor.username} (${classExists.instructorId})`);
+          return NextResponse.json({ 
+            error: 'Access denied to class - not the instructor',
+            debug: { 
+              classId, 
+              classInstructor: classExists.instructor.username,
+              requestedBy: request.user.username,
+              userRole: request.user.role
+            }
+          }, { status: 403 });
+        }
       }
 
       let imported = 0;

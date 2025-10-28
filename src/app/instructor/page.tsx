@@ -85,8 +85,41 @@ export default function InstructorPage() {
         const classesData = await classesResponse.json();
         setClasses(classesData.classes);
         
-        // Auto-select first class if available
-        if (classesData.classes.length > 0) {
+        // Auto-setup default class if instructor has no classes
+        if (classesData.classes.length === 0 && userData.user.role === 'INSTRUCTOR') {
+          console.log('🎓 No classes found, setting up default class for instructor...');
+          
+          try {
+            const setupResponse = await fetch('/api/instructor/auto-setup', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            });
+
+            if (setupResponse.ok) {
+              const setupData = await setupResponse.json();
+              console.log('✅ Auto-setup completed:', setupData);
+              
+              // Refresh classes after auto-setup
+              const refreshResponse = await fetch('/api/classes', {
+                headers: { 'Authorization': `Bearer ${token}` }
+              });
+              
+              if (refreshResponse.ok) {
+                const refreshedClasses = await refreshResponse.json();
+                setClasses(refreshedClasses.classes);
+                if (refreshedClasses.classes.length > 0) {
+                  setSelectedClass(refreshedClasses.classes[0].id);
+                }
+              }
+            }
+          } catch (error) {
+            console.error('Auto-setup failed:', error);
+          }
+        } else if (classesData.classes.length > 0) {
+          // Auto-select first class if available
           setSelectedClass(classesData.classes[0].id);
         }
       }
