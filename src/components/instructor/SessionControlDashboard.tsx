@@ -398,7 +398,7 @@ export default function SessionControlDashboard({ user, classId }: SessionContro
 
     } catch (error) {
       console.error('Error starting session:', error);
-      alert('Failed to start session: ' + error.message);
+      alert('Failed to start session: ' + (error as Error).message);
     }
   };
 

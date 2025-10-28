@@ -73,7 +73,7 @@ export const GET = requireAuth(async (request: NextRequest & { user: any }) => {
             description: fullLesson?.metadata?.description || `Legacy upTick lesson: ${lesson.lessonName}`,
             difficulty: lesson.difficulty,
             estimatedDuration: lesson.estimatedDuration,
-            scenarios: fullLesson?.scenarios?.map(s => s.id) || [],
+            scenarios: fullLesson ? Object.keys(fullLesson.simulations) : [],
             xmlConfig: fullLesson ? await legacyLessonImporter.getXMLContent(lesson.lessonId) : null,
             type: 'LEGACY_LESSON',
             category: lesson.category,

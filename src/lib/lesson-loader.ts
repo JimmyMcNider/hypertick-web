@@ -80,6 +80,7 @@ export interface LessonDefinition {
   metadata?: {
     estimatedDuration?: number;
     difficulty?: string;
+    description?: string;
     objectives?: string[];
     category?: string;
     hasExcelIntegration?: boolean;
