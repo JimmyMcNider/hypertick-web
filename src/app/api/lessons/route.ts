@@ -11,18 +11,31 @@ import { legacyLessonImporter } from '@/lib/legacy-lesson-importer';
 // GET /api/lessons - List available lessons (both database and XML lessons)
 export const GET = requireAuth(async (request: NextRequest & { user: any }) => {
   try {
-    // Get database lessons
-    const dbLessons = await prisma.lesson.findMany({
-      where: { isActive: true },
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        createdAt: true,
-        updatedAt: true
-      },
-      orderBy: { name: 'asc' }
-    });
+    console.log('📚 Loading lessons for user:', request.user.username);
+
+    // Get legacy upTick lessons directly from XML files
+    const legacyLessons = await legacyLessonImporter.scanLegacyLessons();
+    console.log(`📖 Found ${legacyLessons.length} legacy lessons`);
+
+    // Try to get database lessons, but don't fail if DB is unavailable
+    let dbLessons: any[] = [];
+    try {
+      dbLessons = await prisma.lesson.findMany({
+        where: { isActive: true },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          xmlConfig: true,
+          createdAt: true,
+          updatedAt: true
+        },
+        orderBy: { name: 'asc' }
+      });
+      console.log(`🗄️ Found ${dbLessons.length} database lessons`);
+    } catch (dbError) {
+      console.warn('⚠️ Database unavailable, using legacy lessons only:', dbError);
+    }
 
     // Get XML lessons from lesson loader
     let xmlLessons = lessonLoader.getAvailableLessons();
@@ -32,9 +45,6 @@ export const GET = requireAuth(async (request: NextRequest & { user: any }) => {
       await lessonLoader.loadLesson('introduction-to-market-making');
       xmlLessons = lessonLoader.getAvailableLessons();
     }
-
-    // Get legacy upTick lessons
-    const legacyLessons = await legacyLessonImporter.scanLegacyLessons();
 
     // Transform XML lessons to match API format
     const formattedXmlLessons = xmlLessons.map(lesson => ({
@@ -50,22 +60,49 @@ export const GET = requireAuth(async (request: NextRequest & { user: any }) => {
       updatedAt: new Date().toISOString()
     }));
 
-    // Transform legacy lessons to match API format
-    const formattedLegacyLessons = legacyLessons.map(lesson => ({
-      id: lesson.lessonId,
-      name: lesson.lessonName,
-      description: `Legacy upTick lesson: ${lesson.lessonName}`,
-      difficulty: lesson.difficulty,
-      estimatedDuration: lesson.estimatedDuration,
-      scenarios: [], // Will be populated when lesson is loaded
-      type: 'LEGACY_LESSON',
-      category: lesson.category,
-      hasExcelIntegration: !!lesson.excelPath,
-      hasReporting: !!lesson.reportingPath,
-      presentationFiles: lesson.pptFiles.length,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    }));
+    // Transform legacy lessons to match API format with XML content
+    const formattedLegacyLessons = await Promise.all(
+      legacyLessons.map(async (lesson) => {
+        try {
+          // Load the full lesson with XML content
+          const fullLesson = await legacyLessonImporter.loadLegacyLesson(lesson.lessonId);
+          
+          return {
+            id: lesson.lessonId,
+            name: lesson.lessonName,
+            description: fullLesson?.metadata?.description || `Legacy upTick lesson: ${lesson.lessonName}`,
+            difficulty: lesson.difficulty,
+            estimatedDuration: lesson.estimatedDuration,
+            scenarios: fullLesson?.scenarios?.map(s => s.id) || [],
+            xmlConfig: fullLesson ? await legacyLessonImporter.getXMLContent(lesson.lessonId) : null,
+            type: 'LEGACY_LESSON',
+            category: lesson.category,
+            hasExcelIntegration: !!lesson.excelPath,
+            hasReporting: !!lesson.reportingPath,
+            presentationFiles: lesson.pptFiles.length,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+        } catch (error) {
+          console.warn(`⚠️ Could not load full lesson ${lesson.lessonName}:`, error);
+          return {
+            id: lesson.lessonId,
+            name: lesson.lessonName,
+            description: `Legacy upTick lesson: ${lesson.lessonName}`,
+            difficulty: lesson.difficulty,
+            estimatedDuration: lesson.estimatedDuration,
+            scenarios: [],
+            type: 'LEGACY_LESSON',
+            category: lesson.category,
+            hasExcelIntegration: !!lesson.excelPath,
+            hasReporting: !!lesson.reportingPath,
+            presentationFiles: lesson.pptFiles.length,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+        }
+      })
+    );
 
     return NextResponse.json({ 
       lessons: [...dbLessons, ...formattedXmlLessons, ...formattedLegacyLessons],

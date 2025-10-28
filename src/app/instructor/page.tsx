@@ -39,6 +39,7 @@ export default function InstructorPage() {
   const [selectedTab, setSelectedTab] = useState<'lessons' | 'analytics' | 'author' | 'students' | 'live'>('live');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [lessonCount, setLessonCount] = useState(0);
   const router = useRouter();
 
   useEffect(() => {
@@ -88,6 +89,21 @@ export default function InstructorPage() {
         if (classesData.classes.length > 0) {
           setSelectedClass(classesData.classes[0].id);
         }
+      }
+
+      // Load lesson count
+      const lessonsResponse = await fetch('/api/lessons', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (lessonsResponse.ok) {
+        const lessonsData = await lessonsResponse.json();
+        const legacyLessons = lessonsData.lessons.filter((lesson: any) => 
+          lesson.type === 'LEGACY_LESSON' || lesson.xmlConfig
+        );
+        setLessonCount(legacyLessons.length);
       }
 
     } catch (err: any) {
@@ -231,7 +247,7 @@ export default function InstructorPage() {
         </div>
 
         {/* Tab Navigation */}
-        {selectedClass && (
+        {(selectedClass || classes.length === 0) && (
           <div className="bg-white rounded-lg shadow mb-6">
             <div className="px-6 py-4 border-b border-gray-200">
               <div className="flex items-center justify-between">
@@ -297,7 +313,7 @@ export default function InstructorPage() {
             {selectedTab === 'lessons' && (
               <LessonManager 
                 user={user}
-                classId={selectedClass}
+                classId={selectedClass || 'demo-class'}
                 socket={null} // Will be enhanced with WebSocket connection
               />
             )}
@@ -305,7 +321,7 @@ export default function InstructorPage() {
             {selectedTab === 'analytics' && (
               <AnalyticsDashboard
                 user={user}
-                classId={selectedClass}
+                classId={selectedClass || 'demo-class'}
                 socket={null} // Will be enhanced with WebSocket connection
               />
             )}
@@ -313,21 +329,21 @@ export default function InstructorPage() {
             {selectedTab === 'students' && (
               <StudentManagement
                 user={user}
-                classId={selectedClass}
+                classId={selectedClass || 'demo-class'}
               />
             )}
             
             {selectedTab === 'live' && (
               <SessionControlDashboard
                 user={user}
-                classId={selectedClass}
+                classId={selectedClass || 'demo-class'}
               />
             )}
             
             {selectedTab === 'author' && (
               <LessonAuthor
                 user={user}
-                classId={selectedClass}
+                classId={selectedClass || 'demo-class'}
               />
             )}
           </div>
@@ -353,8 +369,8 @@ export default function InstructorPage() {
           </div>
           
           <div className="bg-white rounded-lg shadow p-6">
-            <div className="text-2xl font-bold text-orange-600">1</div>
-            <div className="text-sm text-gray-600">Available Lessons</div>
+            <div className="text-2xl font-bold text-orange-600">{lessonCount}</div>
+            <div className="text-sm text-gray-600">Legacy Lessons Available</div>
           </div>
         </div>
 

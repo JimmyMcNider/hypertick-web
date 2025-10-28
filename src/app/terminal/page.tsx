@@ -50,6 +50,16 @@ interface SessionState {
   };
 }
 
+interface SimulationData {
+  sessionId: string;
+  lessonId: string;
+  lessonName: string;
+  lesson: any;
+  privileges: number[];
+  marketConfig: any;
+  scenarios: any[];
+}
+
 interface TradingWindow {
   id: string;
   privilegeCode: number;
@@ -66,6 +76,7 @@ export default function TradingTerminal() {
   const [user, setUser] = useState<User | null>(null);
   const [socket, setSocket] = useState<Socket | null>(null);
   const [sessionState, setSessionState] = useState<SessionState | null>(null);
+  const [simulationData, setSimulationData] = useState<SimulationData | null>(null);
   const [windows, setWindows] = useState<TradingWindow[]>([]);
   const [maxZIndex, setMaxZIndex] = useState(1000);
   const [loading, setLoading] = useState(true);
@@ -114,6 +125,69 @@ export default function TradingTerminal() {
     };
   }, []);
 
+  // Get URL parameters for session and lesson data
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionId = urlParams.get('session');
+    const lessonId = urlParams.get('lesson');
+    
+    if (sessionId && lessonId) {
+      console.log('Loading real simulation data:', { sessionId, lessonId });
+      loadSimulationData(sessionId, lessonId);
+    }
+  }, []);
+
+  const loadSimulationData = async (sessionId: string, lessonId: string) => {
+    const token = localStorage.getItem('auth_token');
+    if (!token) return;
+
+    try {
+      // Load session data
+      const sessionResponse = await fetch(`/api/sessions/${sessionId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (sessionResponse.ok) {
+        const sessionData = await sessionResponse.json();
+        console.log('✅ Session data loaded:', sessionData);
+        setSessionState(sessionData.session);
+      }
+
+      // Load lesson data with XML configuration
+      const lessonResponse = await fetch(`/api/lessons/${lessonId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (lessonResponse.ok) {
+        const lessonData = await lessonResponse.json();
+        console.log('✅ Lesson data loaded:', lessonData);
+        
+        // Extract privilege grants from lesson XML
+        const privileges = lessonData.lesson.privilegeGrants?.map((grant: any) => grant.privilegeCode) || [];
+        console.log('📋 User privileges for this simulation:', privileges);
+
+        const simData: SimulationData = {
+          sessionId,
+          lessonId,
+          lessonName: lessonData.lesson.name,
+          lesson: lessonData.lesson,
+          privileges,
+          marketConfig: lessonData.lesson.marketConfig || {},
+          scenarios: lessonData.lesson.scenarios || []
+        };
+
+        setSimulationData(simData);
+        
+        // Update user privileges for this session
+        if (user) {
+          setUser({ ...user, privileges });
+        }
+      }
+    } catch (error) {
+      console.error('❌ Failed to load simulation data:', error);
+    }
+  };
+
   const initializeTerminal = async () => {
     const token = localStorage.getItem('auth_token');
     if (!token) {
@@ -145,11 +219,18 @@ export default function TradingTerminal() {
         userPrivileges = privilegeData.userPrivileges || [];
       }
 
-      // For demo, grant all privileges to instructors, basic to students
-      if (userData.user.role === 'INSTRUCTOR' || userData.user.role === 'ADMIN') {
-        userPrivileges = [1, 8, 9, 11, 12, 13, 15, 35]; // All major windows
+      // Use real simulation privileges if available, otherwise demo data
+      if (simulationData?.privileges?.length) {
+        userPrivileges = simulationData.privileges;
+        console.log('🎯 Using real simulation privileges:', userPrivileges);
       } else {
-        userPrivileges = [1, 8, 9, 13, 15]; // Basic student windows including Market Data
+        // Fallback for demo, grant all privileges to instructors, basic to students
+        if (userData.user.role === 'INSTRUCTOR' || userData.user.role === 'ADMIN') {
+          userPrivileges = [1, 8, 9, 11, 12, 13, 15, 35]; // All major windows
+        } else {
+          userPrivileges = [1, 8, 9, 13, 15]; // Basic student windows including Market Data
+        }
+        console.log('🔄 Using fallback privileges:', userPrivileges);
       }
 
       // Initialize windows based on privileges - start with only essential windows visible
@@ -170,6 +251,22 @@ export default function TradingTerminal() {
       
       socketInstance.on('authenticated', (data) => {
         console.log('WebSocket authenticated:', data);
+        
+        // Join session if we have sessionId and user data
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionId = urlParams.get('session');
+        if (sessionId && userData) {
+          console.log(`🔗 Joining WebSocket session: ${sessionId}`);
+          socketInstance.emit('join_session', {
+            sessionId,
+            userId: userData.id,
+            role: userData.role === 'INSTRUCTOR' ? 'Instructor' : 'Student'
+          });
+        }
+      });
+
+      socketInstance.on('session_joined', (data: { sessionId: string; message: string }) => {
+        console.log('✅ Joined session successfully:', data);
       });
 
       socketInstance.on('session_state', (state: SessionState) => {
@@ -372,6 +469,11 @@ export default function TradingTerminal() {
           <span className="text-lg">HYPERTICK TERMINAL</span>
           <span>USER: {user?.username?.toUpperCase()}</span>
           <span>ROLE: {user?.role}</span>
+          {simulationData && (
+            <span className="text-yellow-300 font-bold">
+              SIMULATION: {simulationData.lessonName}
+            </span>
+          )}
           {sessionState && (
             <span className="flex items-center">
               MARKET: 
@@ -453,10 +555,11 @@ export default function TradingTerminal() {
       {/* Professional Trading Workspace */}
       <div className="h-[calc(100vh-50px)]">
         <ProfessionalTradingWorkspace
-          sessionId={sessionState?.id || 'demo-session'}
+          sessionId={sessionState?.id || simulationData?.sessionId || 'demo-session'}
           userId={user?.id || ''}
           userRole={user?.role || 'STUDENT'}
           initialTheme={currentTheme}
+          simulationData={simulationData}
         />
       </div>
     </div>

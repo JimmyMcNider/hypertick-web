@@ -101,16 +101,44 @@ interface TradingWindow {
   props?: any;
 }
 
+interface SimulationData {
+  sessionId: string;
+  lessonId: string;
+  lessonName: string;
+  lesson: any;
+  privileges: number[];
+  marketConfig: any;
+  scenarios: any[];
+}
+
 interface ProfessionalTradingWorkspaceProps {
   sessionId: string;
   userId: string;
   userRole: 'STUDENT' | 'INSTRUCTOR' | 'ADMIN';
   initialTheme?: keyof typeof TRADING_THEMES;
+  simulationData?: SimulationData | null;
 }
 
 // Professional Trading Window Components
-const PortfolioWindow = ({ windowId, theme }: { windowId: string; theme?: any }) => {
+const PortfolioWindow = ({ windowId, theme, simulationData }: { windowId: string; theme?: any; simulationData?: SimulationData | null }) => {
   const currentTheme = theme || TRADING_THEMES.classic;
+  
+  // Get starting cash from simulation or use default
+  const getStartingCash = () => {
+    if (simulationData?.lesson?.name) {
+      const lessonName = simulationData.lesson.name.toLowerCase();
+      if (lessonName.includes('asset allocation')) return 500000; // Larger portfolio for asset allocation
+      if (lessonName.includes('arbitrage')) return 250000; // Medium for arbitrage
+      if (lessonName.includes('bond') || lessonName.includes('debt')) return 1000000; // Large for bonds
+    }
+    return 1003950; // Default upTick starting amount
+  };
+
+  const startingCash = getStartingCash();
+  const simulationNote = simulationData?.lesson?.name ? 
+    `${simulationData.lesson.name} Portfolio` : 
+    'Trading Portfolio';
+
   return (
     <div className={`h-full ${currentTheme.background} ${currentTheme.text} font-mono text-[9px] overflow-hidden`}>
       <div className={`grid grid-cols-4 gap-1 p-1 border-b ${currentTheme.border} ${currentTheme.header} text-[9px]`}>
@@ -122,32 +150,66 @@ const PortfolioWindow = ({ windowId, theme }: { windowId: string; theme?: any })
       <div className="p-1 space-y-1">
         <div className="grid grid-cols-4 gap-1 hover:bg-gray-800">
           <div>USD</div>
-          <div className="text-right">1,003,950</div>
-          <div className={`text-right ${currentTheme.positive}`}>1,003,950</div>
+          <div className="text-right">{startingCash.toLocaleString()}</div>
+          <div className={`text-right ${currentTheme.positive}`}>{startingCash.toLocaleString()}</div>
           <div className="text-right">0</div>
         </div>
         <div className={`border-t ${currentTheme.border} pt-2 mt-0.5`}>
-          <div className={`${currentTheme.positive} font-bold`}>Equity Value: 1,003,950</div>
+          <div className={`${currentTheme.positive} font-bold`}>Equity Value: {startingCash.toLocaleString()}</div>
+          {simulationData && (
+            <div className="text-[9px] text-gray-400 mt-1">{simulationNote}</div>
+          )}
         </div>
       </div>
     </div>
   );
 };
 
-const MarketWatchWindow = ({ windowId, theme }: { windowId: string; theme?: any }) => {
+const MarketWatchWindow = ({ windowId, theme, simulationData }: { windowId: string; theme?: any; simulationData?: SimulationData | null }) => {
   const currentTheme = theme || TRADING_THEMES.classic;
   const [marketData, setMarketData] = useState<Record<string, any>>({});
   
   // Subscribe to real-time market data via WebSocket
   useEffect(() => {
-    // Initialize with default data for known symbols
-    const initialData = {
-      'AOE': { price: 50.00, bid: 49.95, ask: 50.05, volume: 125000, change: 0, changePercent: 0, open: 50.00 },
-      'BOND1': { price: 99.30, bid: 99.29, ask: 99.31, volume: 45000, change: 0, changePercent: 0, open: 99.30 },
-      'BOND2': { price: 102.80, bid: 102.79, ask: 102.81, volume: 32000, change: 0, changePercent: 0, open: 102.80 },
-      'BOND3': { price: 95.50, bid: 95.49, ask: 95.51, volume: 28000, change: 0, changePercent: 0, open: 95.50 },
-      'SPX': { price: 4150.00, bid: 4149.90, ask: 4150.10, volume: 890000, change: 0, changePercent: 0, open: 4150.00 }
-    };
+    // Use real symbols from simulation or fallback to defaults
+    let symbols = ['AOE', 'BOND1', 'BOND2', 'BOND3', 'SPX'];
+    
+    if (simulationData?.lesson?.name) {
+      // Extract symbols based on lesson type
+      const lessonName = simulationData.lesson.name.toLowerCase();
+      if (lessonName.includes('price formation')) {
+        symbols = ['PNR', 'VGR', 'AOE']; // Classic price formation simulation symbols
+      } else if (lessonName.includes('arbitrage')) {
+        symbols = ['STOCK_A', 'STOCK_B', 'ETF']; // Arbitrage simulation
+      } else if (lessonName.includes('bond') || lessonName.includes('debt')) {
+        symbols = ['BOND1', 'BOND2', 'BOND3', 'GOVT_10Y']; // Fixed income simulation
+      } else if (lessonName.includes('asset allocation')) {
+        symbols = ['STOCK', 'BOND', 'CASH', 'REAL_ESTATE']; // Asset allocation simulation
+      }
+      console.log(`🎯 Loading symbols for "${simulationData.lesson.name}":`, symbols);
+    }
+    
+    // Initialize market data for available symbols
+    const initialData: Record<string, any> = {};
+    symbols.forEach(symbol => {
+      // Base prices vary by symbol type and simulation
+      let basePrice = 50.00;
+      if (symbol.includes('BOND') || symbol.includes('GOVT')) basePrice = 99.30;
+      else if (symbol === 'SPX') basePrice = 4150.00;
+      else if (symbol === 'PNR') basePrice = 135.73;
+      else if (symbol === 'VGR') basePrice = 98.87;
+      
+      initialData[symbol] = {
+        price: basePrice,
+        bid: basePrice - 0.05,
+        ask: basePrice + 0.05,
+        volume: Math.floor(Math.random() * 100000) + 50000,
+        change: 0,
+        changePercent: 0,
+        open: basePrice
+      };
+    });
+    
     setMarketData(initialData);
 
     // Simulate live price updates
@@ -176,7 +238,7 @@ const MarketWatchWindow = ({ windowId, theme }: { windowId: string; theme?: any 
     }, 1000); // Update every second
 
     return () => clearInterval(interval);
-  }, []);
+  }, [simulationData]);
 
   const formatPrice = (price: number, symbol: string) => {
     return symbol.startsWith('BOND') ? price.toFixed(2) : price.toFixed(2);
@@ -273,57 +335,119 @@ const BuyingPowerWindow = ({ windowId }: { windowId: string }) => (
   </div>
 );
 
-const NewsWindow = ({ windowId }: { windowId: string }) => (
-  <div className="h-full bg-white text-black text-[9px] overflow-auto">
-    <div className="bg-blue-600 text-white p-1 font-bold text-center text-[9px]">
-      News - Classroom Time: 9:31:51 AM - Simulation Date: 2/10/2000 - Length of Day: 6 seconds
-    </div>
-    <div className="p-2 space-y-1">
-      <div className="grid grid-cols-3 gap-2 text-[9px] font-bold border-b pb-1">
-        <div>Date</div>
-        <div>Ticker</div>
-        <div>Headline</div>
-      </div>
-      <div className="grid grid-cols-3 gap-2 text-[9px] hover:bg-gray-100 py-1">
-        <div>2/9/2000</div>
-        <div className="text-blue-600">VGR</div>
-        <div>Markets reverses EPS estimate for Q1 to 1.05 per share – from 0.9</div>
-      </div>
-      <div className="grid grid-cols-3 gap-2 text-[9px] hover:bg-gray-100 py-1">
-        <div>2/6/2000</div>
-        <div className="text-blue-600">PNR</div>
-        <div>MacroBank estimates earnings of 0.45 per share for Q1</div>
-      </div>
-      <div className="grid grid-cols-3 gap-2 text-[9px] hover:bg-gray-100 py-1">
-        <div>1/29/2000</div>
-        <div className="text-blue-600">PNR</div>
-        <div>FederalBank estimates earnings of 0.53 per share for Q1</div>
-      </div>
-      <div className="grid grid-cols-3 gap-2 text-[9px] hover:bg-gray-100 py-1">
-        <div>1/23/2000</div>
-        <div className="text-blue-600">PNR</div>
-        <div>RYBank estimates earnings of 0.51 per share for Q1</div>
-      </div>
-      <div className="grid grid-cols-3 gap-2 text-[9px] hover:bg-gray-100 py-1">
-        <div>1/23/2000</div>
-        <div className="text-blue-600">PNR</div>
-        <div>BostonBank estimates earnings of 0.43 per share for Q1</div>
-      </div>
-    </div>
-  </div>
-);
+const NewsWindow = ({ windowId, simulationData }: { windowId: string; simulationData?: SimulationData | null }) => {
+  const getSimulationNews = () => {
+    if (!simulationData?.lesson?.name) {
+      return [
+        { date: '2/9/2000', ticker: 'VGR', headline: 'Markets reverses EPS estimate for Q1 to 1.05 per share – from 0.9' },
+        { date: '2/6/2000', ticker: 'PNR', headline: 'MacroBank estimates earnings of 0.45 per share for Q1' }
+      ];
+    }
 
-const MarketOrderWindow = ({ windowId }: { windowId: string }) => {
-  const [symbol, setSymbol] = useState('PNR');
+    const lessonName = simulationData.lesson.name.toLowerCase();
+    if (lessonName.includes('price formation')) {
+      return [
+        { date: '2/10/2000', ticker: 'PNR', headline: 'Price Formation Simulation: Market opens for efficient price discovery' },
+        { date: '2/10/2000', ticker: 'VGR', headline: 'Multiple traders compete to discover fair value' },
+        { date: '2/10/2000', ticker: 'AOE', headline: 'Order book transparency enables price formation' }
+      ];
+    } else if (lessonName.includes('market efficiency')) {
+      return [
+        { date: '2/10/2000', ticker: 'MARKET', headline: 'Market Efficiency Test: Information flow and price adjustment' },
+        { date: '2/10/2000', ticker: 'INFO', headline: 'New information released - observe price response' }
+      ];
+    } else if (lessonName.includes('arbitrage')) {
+      return [
+        { date: '2/10/2000', ticker: 'ARBIT', headline: 'Arbitrage Opportunity: Price discrepancies identified' },
+        { date: '2/10/2000', ticker: 'SPREAD', headline: 'Risk-free profit available through simultaneous trading' }
+      ];
+    } else if (lessonName.includes('asset allocation')) {
+      return [
+        { date: '2/10/2000', ticker: 'PORTFOLIO', headline: 'Asset Allocation Simulation: Optimize risk-return profile' },
+        { date: '2/10/2000', ticker: 'DIVERSIFY', headline: 'Balance stocks, bonds, and alternative investments' }
+      ];
+    }
+    
+    return [
+      { date: '2/10/2000', ticker: 'SIM', headline: `${simulationData.lesson.name} simulation is now active` },
+      { date: '2/10/2000', ticker: 'TRADE', headline: 'Live trading session - participants may begin trading' }
+    ];
+  };
+
+  const currentTime = new Date().toLocaleTimeString();
+  const simulationHeader = simulationData?.lesson?.name ? 
+    `${simulationData.lesson.name} - Live Session` : 
+    'News - Classroom Time: 9:31:51 AM - Simulation Date: 2/10/2000';
+
+  return (
+    <div className="h-full bg-white text-black text-[9px] overflow-auto">
+      <div className="bg-blue-600 text-white p-1 font-bold text-center text-[9px]">
+        {simulationHeader} - Time: {currentTime}
+      </div>
+      <div className="p-2 space-y-1">
+        <div className="grid grid-cols-3 gap-2 text-[9px] font-bold border-b pb-1">
+          <div>Date</div>
+          <div>Ticker</div>
+          <div>Headline</div>
+        </div>
+        {getSimulationNews().map((news, index) => (
+          <div key={index} className="grid grid-cols-3 gap-2 text-[9px] hover:bg-gray-100 py-1">
+            <div>{news.date}</div>
+            <div className="text-blue-600">{news.ticker}</div>
+            <div>{news.headline}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const MarketOrderWindow = ({ windowId, simulationData }: { windowId: string; simulationData?: SimulationData | null }) => {
+  // Default to PNR but use first symbol from simulation if available
+  const getAvailableSymbols = () => {
+    if (simulationData?.lesson?.name) {
+      const lessonName = simulationData.lesson.name.toLowerCase();
+      if (lessonName.includes('price formation')) {
+        return ['PNR', 'VGR', 'AOE'];
+      } else if (lessonName.includes('arbitrage')) {
+        return ['STOCK_A', 'STOCK_B', 'ETF'];
+      } else if (lessonName.includes('bond') || lessonName.includes('debt')) {
+        return ['BOND1', 'BOND2', 'BOND3', 'GOVT_10Y'];
+      } else if (lessonName.includes('asset allocation')) {
+        return ['STOCK', 'BOND', 'CASH', 'REAL_ESTATE'];
+      }
+    }
+    return ['PNR', 'AOE', 'VGR']; // Default symbols
+  };
+
+  const availableSymbols = getAvailableSymbols();
+  const [symbol, setSymbol] = useState(availableSymbols[0]);
   const [quantity, setQuantity] = useState(100);
   const [orderType, setOrderType] = useState<'MARKET' | 'LIMIT'>('MARKET');
   const [limitPrice, setLimitPrice] = useState(135.73);
 
-  const marketData = {
-    PNR: { last: 135.73, bid: 155.30, ask: 135.73, volume: 170413, bidSize: 370, askSize: 272 },
-    AOE: { last: 50.60, bid: 50.55, ask: 50.65, volume: 152000, bidSize: 200, askSize: 150 },
-    VGR: { last: 98.87, bid: 98.86, ask: 98.88, volume: 72000, bidSize: 100, askSize: 180 }
+  // Generate market data based on available symbols
+  const generateMarketData = () => {
+    const data: Record<string, any> = {};
+    availableSymbols.forEach(sym => {
+      let basePrice = 50.00;
+      if (sym.includes('BOND') || sym.includes('GOVT')) basePrice = 99.30;
+      else if (sym === 'PNR') basePrice = 135.73;
+      else if (sym === 'VGR') basePrice = 98.87;
+      
+      data[sym] = {
+        last: basePrice,
+        bid: basePrice - 0.10,
+        ask: basePrice + 0.10,
+        volume: Math.floor(Math.random() * 200000) + 50000,
+        bidSize: Math.floor(Math.random() * 500) + 100,
+        askSize: Math.floor(Math.random() * 500) + 100
+      };
+    });
+    return data;
   };
+  
+  const marketData = generateMarketData();
 
   const currentData = marketData[symbol as keyof typeof marketData] || marketData.PNR;
 
@@ -383,11 +507,11 @@ const MarketOrderWindow = ({ windowId }: { windowId: string }) => {
           <select 
             value={symbol} 
             onChange={(e) => setSymbol(e.target.value)}
-            className="px-1 py-1 border rounded text-[9px]"
+            className="px-1 py-1 border rounded text-[9px] text-black bg-white"
           >
-            <option value="PNR">PNR</option>
-            <option value="AOE">AOE</option>
-            <option value="VGR">VGR</option>
+            {availableSymbols.map(sym => (
+              <option key={sym} value={sym}>{sym}</option>
+            ))}
           </select>
         </div>
 
@@ -398,7 +522,7 @@ const MarketOrderWindow = ({ windowId }: { windowId: string }) => {
             type="number" 
             value={quantity}
             onChange={(e) => setQuantity(parseInt(e.target.value) || 0)}
-            className="px-1 py-1 border rounded text-[9px]"
+            className="px-1 py-1 border rounded text-[9px] text-black bg-white"
             min="1"
           />
         </div>
@@ -435,7 +559,7 @@ const MarketOrderWindow = ({ windowId }: { windowId: string }) => {
               type="number" 
               value={limitPrice}
               onChange={(e) => setLimitPrice(parseFloat(e.target.value) || 0)}
-              className="px-1 py-1 border rounded text-[9px]"
+              className="px-1 py-1 border rounded text-[9px] text-black bg-white"
               step="0.01"
               min="0"
             />
@@ -481,8 +605,26 @@ const OrderLogWindow = ({ windowId }: { windowId: string }) => (
   </div>
 );
 
-const MarketGraphWindow = ({ windowId }: { windowId: string }) => {
-  const [selectedSymbol, setSelectedSymbol] = useState('AOE');
+const MarketGraphWindow = ({ windowId, simulationData }: { windowId: string; simulationData?: SimulationData | null }) => {
+  // Get symbols for the simulation
+  const getAvailableSymbols = () => {
+    if (simulationData?.lesson?.name) {
+      const lessonName = simulationData.lesson.name.toLowerCase();
+      if (lessonName.includes('price formation')) {
+        return ['PNR', 'VGR', 'AOE'];
+      } else if (lessonName.includes('arbitrage')) {
+        return ['STOCK_A', 'STOCK_B', 'ETF'];
+      } else if (lessonName.includes('bond') || lessonName.includes('debt')) {
+        return ['BOND1', 'BOND2', 'BOND3', 'GOVT_10Y'];
+      } else if (lessonName.includes('asset allocation')) {
+        return ['STOCK', 'BOND', 'CASH', 'REAL_ESTATE'];
+      }
+    }
+    return ['AOE', 'SPX', 'BOND1', 'BOND2', 'BOND3'];
+  };
+
+  const availableSymbols = getAvailableSymbols();
+  const [selectedSymbol, setSelectedSymbol] = useState(availableSymbols[0]);
   const [priceHistory, setPriceHistory] = useState<number[]>([]);
   const [currentPrice, setCurrentPrice] = useState(50.00);
   const [priceChange, setPriceChange] = useState(0);
@@ -545,7 +687,7 @@ const MarketGraphWindow = ({ windowId }: { windowId: string }) => {
            selectedSymbol === 'SPX' ? price.toFixed(2) : price.toFixed(2);
   };
 
-  const symbols = ['AOE', 'SPX', 'BOND1', 'BOND2', 'BOND3'];
+  const symbols = availableSymbols;
 
   return (
     <div className="h-full bg-black text-green-400 font-mono text-[9px] overflow-hidden">
@@ -847,7 +989,7 @@ const AuctionWindow = ({ windowId }: { windowId: string }) => {
               placeholder={`Min: ${selectedAuction.currentBid + 100}`}
               value={bidAmount}
               onChange={(e) => setBidAmount(e.target.value)}
-              className="w-full p-2 text-black rounded text-[9px]"
+              className="w-full p-2 text-black bg-white rounded text-[9px]"
               min={selectedAuction.currentBid + 100}
             />
             <Button 
@@ -881,7 +1023,8 @@ export default function ProfessionalTradingWorkspace({
   sessionId, 
   userId, 
   userRole,
-  initialTheme = 'classic'
+  initialTheme = 'classic',
+  simulationData
 }: ProfessionalTradingWorkspaceProps) {
   const [currentTheme, setCurrentTheme] = useState<keyof typeof TRADING_THEMES>(initialTheme);
   
@@ -1151,7 +1294,7 @@ export default function ProfessionalTradingWorkspace({
 
             {/* Window Content */}
             <div className="h-full pb-8">
-              <WindowComponent windowId={window.id} theme={theme} {...window.props} />
+              <WindowComponent windowId={window.id} theme={theme} simulationData={simulationData} {...window.props} />
             </div>
           </div>
         );

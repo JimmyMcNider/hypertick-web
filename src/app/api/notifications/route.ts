@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { shouldAttemptDb, markDbStatus, createFallbackResponse, fallbackData } from '@/lib/db-fallback';
 
 // GET /api/notifications - Get user notifications
 export const GET = requireAuth(async (request: NextRequest & { user: any }) => {
@@ -9,21 +10,37 @@ export const GET = requireAuth(async (request: NextRequest & { user: any }) => {
     const unreadOnly = url.searchParams.get('unreadOnly') === 'true';
     const limit = parseInt(url.searchParams.get('limit') || '20');
 
-    const notifications = await prisma.notification.findMany({
-      where: {
-        userId: request.user.id,
-        ...(unreadOnly ? { isRead: false } : {})
-      },
-      orderBy: {
-        createdAt: 'desc'
-      },
-      take: limit
-    });
+    // Check if we should attempt database connection
+    if (!shouldAttemptDb()) {
+      return NextResponse.json(createFallbackResponse({ 
+        notifications: fallbackData.notifications 
+      }, 'Notifications service in fallback mode'));
+    }
 
-    return NextResponse.json({ notifications });
+    try {
+      const notifications = await prisma.notification.findMany({
+        where: {
+          userId: request.user.id,
+          ...(unreadOnly ? { isRead: false } : {})
+        },
+        orderBy: {
+          createdAt: 'desc'
+        },
+        take: limit
+      });
+
+      markDbStatus('connected');
+      return NextResponse.json({ notifications });
+
+    } catch (dbError: any) {
+      markDbStatus('failed');
+      return NextResponse.json(createFallbackResponse({ 
+        notifications: fallbackData.notifications 
+      }, 'Database unavailable - no notifications to display'));
+    }
 
   } catch (error: any) {
-    console.error('Error fetching notifications:', error);
+    console.error('Error in notifications API:', error);
     return NextResponse.json({ error: 'Failed to fetch notifications' }, { status: 500 });
   }
 });

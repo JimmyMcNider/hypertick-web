@@ -297,6 +297,36 @@ export class LegacyLessonImporter {
   }
 
   /**
+   * Get XML content for a specific lesson
+   */
+  async getXMLContent(lessonIdentifier: string): Promise<string | null> {
+    try {
+      // Find lesson in index
+      let lessonIndex = this.lessonIndex.find(
+        l => l.lessonId === lessonIdentifier || l.lessonName === lessonIdentifier
+      );
+
+      // If not in index, scan for it
+      if (!lessonIndex) {
+        await this.scanLegacyLessons();
+        lessonIndex = this.lessonIndex.find(
+          l => l.lessonId === lessonIdentifier || l.lessonName === lessonIdentifier
+        );
+      }
+
+      if (!lessonIndex) {
+        return null;
+      }
+
+      // Read XML file content
+      return await fs.readFile(lessonIndex.xmlPath, 'utf-8');
+    } catch (error) {
+      console.error(`Error reading XML content for lesson ${lessonIdentifier}:`, error);
+      return null;
+    }
+  }
+
+  /**
    * Export lesson configuration for web platform
    */
   async exportLessonConfigurations(): Promise<any[]> {

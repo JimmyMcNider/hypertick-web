@@ -109,7 +109,7 @@ export default function LessonAuthor({ user, classId }: LessonAuthorProps) {
                 type="text"
                 value={lesson.name}
                 onChange={(e) => updateLesson({ name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-black bg-white"
                 placeholder="Enter lesson name"
               />
             </div>
@@ -127,7 +127,7 @@ export default function LessonAuthor({ user, classId }: LessonAuthorProps) {
                     estimatedDuration: parseInt(e.target.value) || 90 
                   } 
                 })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-black bg-white"
                 min="1"
               />
             </div>

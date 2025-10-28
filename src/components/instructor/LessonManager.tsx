@@ -323,7 +323,7 @@ export default function LessonManager({ user, classId, socket }: LessonManagerPr
                         setSelectedScenario(Object.keys(lesson.simulations)[0] || 'Simulation A');
                       }
                     }}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2"
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-black bg-white"
                   >
                     <option value="">Select a lesson...</option>
                     {availableLessons.map((lesson) => (
@@ -343,7 +343,7 @@ export default function LessonManager({ user, classId, socket }: LessonManagerPr
                       <select
                         value={selectedScenario}
                         onChange={(e) => setSelectedScenario(e.target.value)}
-                        className="w-full border border-gray-300 rounded-md px-3 py-2"
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-black bg-white"
                       >
                         {Object.entries(selectedLesson.simulations).map(([key, simulation]) => (
                           <option key={key} value={key}>

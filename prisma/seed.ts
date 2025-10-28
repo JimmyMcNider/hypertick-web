@@ -155,10 +155,10 @@ async function main() {
   }
   console.log(`✅ Created ${securities.length} securities`);
 
-  // 7. Create sample lessons instead of loading legacy XML
-  console.log('📚 Creating sample lessons...');
-  await createSampleLessons();
-  console.log('✅ Created sample lessons');
+  // 7. Load legacy XML lessons from upTick distribution
+  console.log('📚 Loading legacy lessons from upTick distribution...');
+  await loadLegacyLessons();
+  console.log('✅ Loaded legacy lessons');
 
   console.log('🎉 Database seed completed successfully!');
 }
@@ -179,29 +179,99 @@ async function loadLegacyLessons() {
     .filter(dirent => dirent.isDirectory())
     .map(dirent => dirent.name);
 
+  console.log(`  🔍 Found ${lessonDirs.length} legacy lesson directories`);
+
   for (const lessonDir of lessonDirs) {
-    const lessonXmlPath = path.join(legacyLessonsPath, lessonDir, `lesson - ${lessonDir}.xml`);
-    
-    if (fs.existsSync(lessonXmlPath)) {
-      const xmlContent = fs.readFileSync(lessonXmlPath, 'utf-8');
+    try {
+      const lessonXmlPath = path.join(legacyLessonsPath, lessonDir, `lesson - ${lessonDir}.xml`);
       
-      await prisma.lesson.upsert({
-        where: { name: lessonDir },
-        update: {
-          xmlConfig: xmlContent,
-          description: `Legacy lesson: ${lessonDir}`
-        },
-        create: {
-          name: lessonDir,
-          xmlConfig: xmlContent,
-          description: `Legacy lesson: ${lessonDir}`,
-          isActive: true
-        }
-      });
-      
-      console.log(`  📖 Loaded lesson: ${lessonDir}`);
+      if (fs.existsSync(lessonXmlPath)) {
+        const xmlContent = fs.readFileSync(lessonXmlPath, 'utf-8');
+        
+        // Parse lesson metadata from XML
+        const lessonMetadata = parseLessonMetadata(lessonDir, xmlContent);
+        
+        // Check for additional files
+        const lessonFiles = fs.readdirSync(path.join(legacyLessonsPath, lessonDir));
+        const hasExcel = lessonFiles.some(f => f.endsWith('.xls') || f.endsWith('.xlsx'));
+        const hasReporting = lessonFiles.some(f => f.startsWith('reporting - '));
+        const pptCount = lessonFiles.filter(f => f.endsWith('.ppt') || f.endsWith('.pptx')).length;
+        
+        await prisma.lesson.upsert({
+          where: { name: lessonDir },
+          update: {
+            xmlConfig: xmlContent,
+            description: lessonMetadata.description
+          },
+          create: {
+            name: lessonDir,
+            xmlConfig: xmlContent,
+            description: lessonMetadata.description,
+            isActive: true
+          }
+        });
+        
+        console.log(`  📖 Loaded lesson: ${lessonDir} (${lessonMetadata.category}, ${lessonMetadata.scenarios.length} scenarios, ${lessonMetadata.estimatedDuration}min)`);
+      } else {
+        console.log(`  ⚠️  XML file not found for lesson: ${lessonDir}`);
+      }
+    } catch (error) {
+      console.error(`  ❌ Error loading lesson ${lessonDir}:`, error);
     }
   }
+}
+
+/**
+ * Parse lesson metadata from XML content
+ */
+function parseLessonMetadata(lessonName: string, xmlContent: string) {
+  // Extract simulation scenarios from XML
+  const scenarioMatches = xmlContent.match(/<simulation id="([^"]+)"/g) || [];
+  const scenarios = scenarioMatches.map(match => match.match(/"([^"]+)"/)?.[1] || '').filter(Boolean);
+  
+  // Determine category based on lesson name
+  const name = lessonName.toLowerCase();
+  let category = 'GENERAL';
+  if (name.includes('price formation') || name.includes('market efficiency')) {
+    category = 'MARKET_MICROSTRUCTURE';
+  } else if (name.includes('arbitrage')) {
+    category = 'ARBITRAGE_STRATEGIES';
+  } else if (name.includes('option') || name.includes('cdo')) {
+    category = 'DERIVATIVES';
+  } else if (name.includes('asset allocation')) {
+    category = 'PORTFOLIO_THEORY';
+  } else if (name.includes('risky debt')) {
+    category = 'FIXED_INCOME';
+  }
+  
+  // Determine difficulty
+  let difficulty = 'INTERMEDIATE';
+  if (name.includes('price formation') || name.includes('market efficiency')) {
+    difficulty = 'BEGINNER';
+  } else if (name.includes('cdo') || name.includes('convertible') || name.includes('iii')) {
+    difficulty = 'ADVANCED';
+  }
+  
+  // Estimate duration based on complexity
+  let estimatedDuration = 90; // Default 90 minutes
+  if (name.includes('price formation') || name.includes('market efficiency')) {
+    estimatedDuration = 90;
+  } else if (name.includes('asset allocation') || name.includes('arbitrage')) {
+    estimatedDuration = 120;
+  } else if (name.includes('cdo') || name.includes('option') || name.includes('risky debt')) {
+    estimatedDuration = 150;
+  }
+  
+  // Create description
+  const description = `${lessonName} - ${category.replace('_', ' ').toLowerCase()} simulation with ${scenarios.length} scenario${scenarios.length !== 1 ? 's' : ''} (${scenarios.join(', ')})`;
+  
+  return {
+    scenarios,
+    category,
+    difficulty,
+    estimatedDuration,
+    description
+  };
 }
 
 /**

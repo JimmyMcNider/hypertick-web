@@ -44,39 +44,41 @@ export default function OrderEntryPanel({ user, sessionState, socket }: OrderEnt
 
   useEffect(() => {
     if (socket) {
-      socket.on('order_response', (data: { success: boolean; orderId?: string }) => {
+      socket.on('order_update', (data: { order: any; trades?: any[]; marketUpdate?: any; timestamp: Date }) => {
         setIsSubmitting(false);
-        if (data.success) {
-          setLastOrderStatus(`SUCCESS: Order ${data.orderId} submitted`);
+        if (data.order && data.order.userId === user?.id) {
+          setLastOrderStatus(`SUCCESS: Order ${data.order.id} submitted`);
           // Clear form on successful submission
           setOrderForm(prev => ({
             ...prev,
             quantity: '',
             price: orderForm.orderType === 'MARKET' ? '' : prev.price
           }));
+          
+          // If trades occurred, show fill status
+          if (data.trades && data.trades.length > 0) {
+            const trade = data.trades.find(t => t.orderId === data.order.id);
+            if (trade) {
+              setLastOrderStatus(`FILLED: ${trade.side} ${trade.quantity} ${trade.symbol} @ $${trade.price.toFixed(2)}`);
+            }
+          }
         }
       });
 
-      socket.on('order_error', (data: { error: string }) => {
+      socket.on('order_rejected', (data: { orderId: string; reason: string; timestamp: Date }) => {
         setIsSubmitting(false);
-        setLastOrderStatus(`ERROR: ${data.error}`);
+        setLastOrderStatus(`ERROR: ${data.reason}`);
       });
 
-      socket.on('trade_execution', (data: {
-        orderId: string;
-        symbol: string;
-        side: string;
-        quantity: number;
-        price: number;
-        timestamp: string;
-      }) => {
-        setLastOrderStatus(`FILLED: ${data.side} ${data.quantity} ${data.symbol} @ $${data.price.toFixed(2)}`);
+      socket.on('error', (data: { message: string }) => {
+        setIsSubmitting(false);
+        setLastOrderStatus(`ERROR: ${data.message}`);
       });
 
       return () => {
-        socket.off('order_response');
-        socket.off('order_error');
-        socket.off('trade_execution');
+        socket.off('order_update');
+        socket.off('order_rejected');
+        socket.off('error');
       };
     }
   }, [socket, orderForm.orderType]);
@@ -103,6 +105,9 @@ export default function OrderEntryPanel({ user, sessionState, socket }: OrderEnt
     setLastOrderStatus('SUBMITTING ORDER...');
 
     const order = {
+      id: `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      userId: user?.id || 'unknown',
+      securityId: orderForm.symbol,
       symbol: orderForm.symbol,
       side: orderForm.side,
       type: orderForm.orderType,
@@ -112,7 +117,7 @@ export default function OrderEntryPanel({ user, sessionState, socket }: OrderEnt
     };
 
     try {
-      socket.emit('place_order', order);
+      socket.emit('submit_order', order);
     } catch (error) {
       setIsSubmitting(false);
       setLastOrderStatus('ERROR: Order submission failed');

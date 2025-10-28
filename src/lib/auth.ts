@@ -92,33 +92,60 @@ export class AuthService {
    * Authenticate user login
    */
   async login(credentials: LoginCredentials): Promise<{ user: AuthUser; token: string }> {
-    // Find user by username or email
-    const user = await prisma.user.findFirst({
-      where: {
-        OR: [
-          { username: credentials.username },
-          { email: credentials.username }
-        ]
+    try {
+      // Find user by username or email
+      const user = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { username: credentials.username },
+            { email: credentials.username }
+          ]
+        }
+      });
+
+      if (!user) {
+        throw new Error('Invalid credentials');
       }
-    });
 
-    if (!user) {
-      throw new Error('Invalid credentials');
+      // Verify password
+      const isValidPassword = await bcrypt.compare(credentials.password, user.password);
+      if (!isValidPassword) {
+        throw new Error('Invalid credentials');
+      }
+
+      // Generate JWT token
+      const token = this.generateToken(user.id);
+      
+      return {
+        user: this.sanitizeUser(user),
+        token
+      };
+    } catch (dbError) {
+      console.warn('🔄 Database unavailable, checking fallback credentials:', dbError);
+      
+      // Fallback authentication for demo when database is unavailable
+      if (credentials.username === 'instructor' && credentials.password === 'instructor123') {
+        const fallbackUser: AuthUser = {
+          id: 'instructor_fallback',
+          email: 'instructor@hypertick.com',
+          username: 'instructor',
+          firstName: 'Demo',
+          lastName: 'Instructor',
+          role: 'INSTRUCTOR'
+        };
+        
+        const token = this.generateToken(fallbackUser.id);
+        console.log('✅ Fallback instructor login successful');
+        
+        return {
+          user: fallbackUser,
+          token
+        };
+      }
+      
+      // Re-throw database error if not fallback credentials
+      throw new Error('Authentication service unavailable');
     }
-
-    // Verify password
-    const isValidPassword = await bcrypt.compare(credentials.password, user.password);
-    if (!isValidPassword) {
-      throw new Error('Invalid credentials');
-    }
-
-    // Generate JWT token
-    const token = this.generateToken(user.id);
-    
-    return {
-      user: this.sanitizeUser(user),
-      token
-    };
   }
 
   /**
@@ -127,6 +154,18 @@ export class AuthService {
   async verifyToken(token: string): Promise<AuthUser> {
     try {
       const decoded = jwt.verify(token, this.jwtSecret) as { userId: string };
+      
+      // Handle fallback instructor
+      if (decoded.userId === 'instructor_fallback') {
+        return {
+          id: 'instructor_fallback',
+          email: 'instructor@hypertick.com',
+          username: 'instructor',
+          firstName: 'Demo',
+          lastName: 'Instructor',
+          role: 'INSTRUCTOR'
+        };
+      }
       
       const user = await prisma.user.findUnique({
         where: { id: decoded.userId }

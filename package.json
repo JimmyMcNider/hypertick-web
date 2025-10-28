@@ -4,6 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "tsx server.ts",
+    "dev:fast": "node scripts/dev-setup.js && tsx server.ts",
+    "dev:setup": "node scripts/dev-setup.js",
+    "dev:reset": "rm -f ./dev.db && npm run dev:setup",
     "dev:next": "next dev",
     "dev:ws": "tsx server.ts",
     "build": "next build",

@@ -554,7 +554,7 @@ export class TradingWebSocketServer {
     }
 
     // Broadcast market update to all sessions
-    this.io.emit('market_update', currentData);
+    this.io.emit('market_data', currentData);
   }
 
   private setupPositionServiceListeners() {
@@ -698,7 +698,7 @@ export class TradingWebSocketServer {
     positionService.updateMarketPrice(symbol, price);
 
     // Broadcast market update to all sessions
-    this.io.emit('market_update', currentData);
+    this.io.emit('market_data', currentData);
   }
 
   private async checkStopOrderTriggers(symbol: string, currentPrice: number) {
@@ -813,6 +813,36 @@ export class TradingWebSocketServer {
         tick: 0
       });
     });
+
+    // Start continuous market data simulation
+    this.startMarketDataSimulation();
+  }
+
+  private startMarketDataSimulation() {
+    // Update market data every 2-5 seconds with small random changes
+    setInterval(() => {
+      this.marketData.forEach((data, symbol) => {
+        // Small random price movement (±0.5%)
+        const change = (Math.random() - 0.5) * 0.01 * data.lastPrice;
+        const newPrice = Math.max(0.01, data.lastPrice + change);
+        
+        // Update spread around new price
+        const spread = newPrice * 0.002; // 0.2% spread
+        data.lastPrice = parseFloat(newPrice.toFixed(2));
+        data.bid = parseFloat((newPrice - spread / 2).toFixed(2));
+        data.ask = parseFloat((newPrice + spread / 2).toFixed(2));
+        data.tick += 1;
+        
+        // Simulate volume
+        data.volume += Math.floor(Math.random() * 50);
+
+        // Update position service with new market price
+        positionService.updateMarketPrice(symbol, data.lastPrice);
+      });
+
+      // Broadcast updated market data to all connected clients
+      this.io.emit('market_data', Array.from(this.marketData.values()));
+    }, 2000 + Math.random() * 3000); // Random interval between 2-5 seconds
   }
 
   // Methods for instructor controls

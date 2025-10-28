@@ -10,6 +10,8 @@
 import { useState, useEffect } from 'react';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { enhancedSessionEngine } from '@/lib/enhanced-session-engine';
+import { LessonXMLParser } from '@/lib/lesson-xml-parser';
+import { xmlCommandProcessor } from '@/lib/xml-command-processor';
 
 interface SessionControlProps {
   user: any;
@@ -39,6 +41,10 @@ interface SessionTemplate {
   maxStudents: number;
   markets: string[];
   privileges: string[];
+  scenarios: string[];
+  category: string;
+  parsedLesson?: any;
+  legacyLesson?: any;
 }
 
 interface ActiveSession {
@@ -74,6 +80,42 @@ export default function SessionControlDashboard({ user, classId }: SessionContro
     userId: user?.id || '', 
     role: 'Instructor' 
   });
+
+  // Helper functions for parsing lesson XML
+  const extractScenariosFromXML = (xmlContent: string): string[] => {
+    const scenarioMatches = xmlContent.match(/<simulation id="([^"]+)"/g) || [];
+    return scenarioMatches.map(match => match.match(/"([^"]+)"/)?.[1] || '').filter(Boolean);
+  };
+
+  const extractPrivilegesFromXML = (xmlContent: string): string[] => {
+    const privilegeMatches = xmlContent.match(/<command name="Grant Privilege">\s*<parameter>(\d+)<\/parameter>/g) || [];
+    return privilegeMatches.map(match => {
+      const privilegeId = match.match(/<parameter>(\d+)<\/parameter>/)?.[1];
+      return privilegeId ? `privilege_${privilegeId}` : '';
+    }).filter(Boolean);
+  };
+
+  const inferDifficultyFromName = (lessonName: string): 'beginner' | 'intermediate' | 'advanced' => {
+    const name = lessonName.toLowerCase();
+    if (name.includes('price formation') || name.includes('market efficiency')) {
+      return 'beginner';
+    } else if (name.includes('cdo') || name.includes('convertible') || name.includes('iii')) {
+      return 'advanced';
+    }
+    return 'intermediate';
+  };
+
+  const inferDurationFromName = (lessonName: string): number => {
+    const name = lessonName.toLowerCase();
+    if (name.includes('price formation') || name.includes('market efficiency')) {
+      return 90; // 1.5 hours for foundational lessons
+    } else if (name.includes('asset allocation') || name.includes('arbitrage')) {
+      return 120; // 2 hours for intermediate topics
+    } else if (name.includes('cdo') || name.includes('option') || name.includes('risky debt')) {
+      return 150; // 2.5 hours for advanced topics
+    }
+    return 90; // Default 1.5 hours
+  };
 
   useEffect(() => {
     loadDashboardData();
@@ -113,98 +155,135 @@ export default function SessionControlDashboard({ user, classId }: SessionContro
   };
 
   const loadStudents = async () => {
-    // Simulate loading enrolled students
-    const mockStudents: Student[] = [
-      {
-        id: 'student_1',
-        name: 'Alice Johnson',
-        email: 'alice@university.edu',
-        status: 'online',
-        terminal: 'Terminal 1',
-        lastActivity: new Date(),
-        currentBalance: 10000,
-        totalTrades: 0,
-        pnl: 0,
-        position: 'Cash'
-      },
-      {
-        id: 'student_2',
-        name: 'Bob Chen',
-        email: 'bob@university.edu',
-        status: 'online',
-        terminal: 'Terminal 2',
-        lastActivity: new Date(Date.now() - 2 * 60 * 1000),
-        currentBalance: 10000,
-        totalTrades: 0,
-        pnl: 0,
-        position: 'Cash'
-      },
-      {
-        id: 'student_3',
-        name: 'Carol Davis',
-        email: 'carol@university.edu',
-        status: 'offline',
-        terminal: 'Terminal 3',
-        lastActivity: new Date(Date.now() - 15 * 60 * 1000),
-        currentBalance: 10000,
-        totalTrades: 0,
-        pnl: 0,
-        position: 'Cash'
-      },
-      {
-        id: 'student_4',
-        name: 'David Wilson',
-        email: 'david@university.edu',
-        status: 'online',
-        terminal: 'Terminal 4',
-        lastActivity: new Date(Date.now() - 30 * 1000),
-        currentBalance: 10000,
-        totalTrades: 0,
-        pnl: 0,
-        position: 'Cash'
+    try {
+      // Load real enrolled students from API
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`/api/classes/${classId}/students`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const enrolledStudents = data.students || [];
+        
+        // Transform API response to match Student interface
+        const transformedStudents: Student[] = enrolledStudents.map((student: any, index: number) => ({
+          id: student.id,
+          name: `${student.firstName} ${student.lastName}`,
+          email: student.email,
+          status: 'offline' as const, // Default to offline, will be updated by WebSocket events
+          terminal: `Terminal ${index + 1}`,
+          lastActivity: new Date(student.enrollmentDate || Date.now()),
+          currentBalance: 10000, // Starting balance
+          totalTrades: 0,
+          pnl: 0,
+          position: 'Cash'
+        }));
+
+        console.log(`📊 Loaded ${transformedStudents.length} enrolled students`);
+        setStudents(transformedStudents);
+      } else {
+        console.error('Failed to load students:', response.statusText);
+        setStudents([]); // No students if API fails
       }
-    ];
-    setStudents(mockStudents);
+    } catch (error) {
+      console.error('Error loading students:', error);
+      setStudents([]); // No students if error occurs
+    }
   };
 
   const loadSessionTemplates = async () => {
-    // Load available lesson/session templates
-    const mockTemplates: SessionTemplate[] = [
-      {
-        id: 'template_1',
-        name: 'Price Formation Basics',
-        description: 'Introduction to market microstructure and price discovery',
-        duration: 30,
-        lessonId: 'lesson_price_formation',
+    try {
+      console.log('📚 Loading upTick legacy lessons...');
+      const token = localStorage.getItem('auth_token');
+      
+      // First try to load legacy upTick lessons
+      const legacyResponse = await fetch('/api/lessons/legacy', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (legacyResponse.ok) {
+        const legacyData = await legacyResponse.json();
+        const legacyLessons = legacyData.lessons || [];
+        
+        console.log(`📖 Found ${legacyLessons.length} legacy upTick lessons`);
+        
+        // Convert legacy lessons to session templates
+        const legacyTemplates: SessionTemplate[] = legacyLessons.map((lesson: any) => ({
+          id: lesson.lessonId,
+          name: lesson.lessonName,
+          description: `${lesson.category}: ${lesson.scenarioCount} scenario${lesson.scenarioCount !== 1 ? 's' : ''}`,
+          duration: lesson.estimatedDuration,
+          lessonId: lesson.lessonId,
+          difficulty: lesson.difficulty.toLowerCase() as 'beginner' | 'intermediate' | 'advanced',
+          maxStudents: 24,
+          markets: ['AOE', 'BOND1', 'BOND2', 'BOND3', 'SPX'],
+          privileges: [`${lesson.scenarioCount} privileges`],
+          scenarios: lesson.scenarios || [],
+          category: lesson.category,
+          legacyLesson: lesson // Store the full legacy lesson data
+        }));
+
+        if (legacyTemplates.length > 0) {
+          console.log(`✅ Loaded ${legacyTemplates.length} legacy lesson templates`);
+          setSessionTemplates(legacyTemplates);
+          return;
+        }
+      }
+
+      // Fallback to regular lessons API
+      const response = await fetch('/api/lessons', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const lessons = data.lessons || [];
+        
+        // Convert lessons to session templates
+        const templates: SessionTemplate[] = lessons.map((lesson: any) => ({
+          id: lesson.id,
+          name: lesson.name,
+          description: lesson.description || 'Trading simulation lesson',
+          duration: lesson.estimatedDuration || 45,
+          lessonId: lesson.id,
+          difficulty: (lesson.difficulty || 'intermediate').toLowerCase() as 'beginner' | 'intermediate' | 'advanced',
+          maxStudents: 24,
+          markets: ['AOE', 'BOND1', 'BOND2', 'BOND3', 'SPX'],
+          privileges: ['Basic trading privileges'],
+          scenarios: lesson.scenarios || ['Simulation A'],
+          category: lesson.category || 'General Trading'
+        }));
+
+        console.log(`📚 Loaded ${templates.length} fallback lesson templates`);
+        setSessionTemplates(templates);
+      } else {
+        console.error('Failed to load lessons:', response.statusText);
+        setSessionTemplates([]);
+      }
+    } catch (error) {
+      console.error('Error loading lesson templates:', error);
+      // Create a minimal fallback template
+      setSessionTemplates([{
+        id: 'PRICE_FORMATION',
+        name: 'Price Formation',
+        description: 'Basic price formation lesson',
+        duration: 45,
+        lessonId: 'PRICE_FORMATION',
         difficulty: 'beginner',
         maxStudents: 24,
-        markets: ['AAPL', 'MSFT'],
-        privileges: ['basic_trading', 'market_data', 'position_display']
-      },
-      {
-        id: 'template_2',
-        name: 'Market Efficiency Challenge',
-        description: 'Advanced trading simulation testing market efficiency concepts',
-        duration: 45,
-        lessonId: 'lesson_market_efficiency',
-        difficulty: 'intermediate',
-        maxStudents: 20,
-        markets: ['AAPL', 'MSFT', 'GOOGL', 'TSLA'],
-        privileges: ['advanced_trading', 'level2_data', 'short_selling', 'options']
-      },
-      {
-        id: 'template_3',
-        name: 'Options Pricing Lab',
-        description: 'Hands-on options trading and Greeks calculation',
-        duration: 60,
-        lessonId: 'lesson_options_pricing',
-        difficulty: 'advanced',
-        maxStudents: 16,
-        markets: ['SPY', 'QQQ'],
-        privileges: ['options_trading', 'greeks_display', 'volatility_tools', 'risk_analytics']
-      }
-    ];
-    setSessionTemplates(mockTemplates);
+        markets: ['AOE'],
+        privileges: ['Basic trading'],
+        scenarios: ['Simulation A'],
+        category: 'Market Microstructure'
+      }]);
+    }
   };
 
   const loadActiveSession = async () => {
@@ -214,6 +293,7 @@ export default function SessionControlDashboard({ user, classId }: SessionContro
   };
 
   const handleStudentConnected = (data: any) => {
+    console.log('📱 Student connected:', data.studentId);
     setStudents(prev => prev.map(student => 
       student.id === data.studentId 
         ? { ...student, status: 'online', lastActivity: new Date() }
@@ -222,6 +302,7 @@ export default function SessionControlDashboard({ user, classId }: SessionContro
   };
 
   const handleStudentDisconnected = (data: any) => {
+    console.log('📱 Student disconnected:', data.studentId);
     setStudents(prev => prev.map(student => 
       student.id === data.studentId 
         ? { ...student, status: 'offline', lastActivity: new Date() }
@@ -269,21 +350,41 @@ export default function SessionControlDashboard({ user, classId }: SessionContro
     const template = sessionTemplates.find(t => t.id === selectedTemplate);
     if (!template) return;
 
-    const onlineStudents = students.filter(s => s.status === 'online');
-    if (onlineStudents.length === 0) {
-      alert('No students are currently online');
-      return;
-    }
-
     try {
-      // Create new session
+      console.log(`🚀 Starting live session for lesson: ${template.name}`);
+      
+      // Create session in database via API
+      const token = localStorage.getItem('auth_token');
+      const sessionResponse = await fetch('/api/sessions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          lessonId: template.lessonId,
+          classId: classId,
+          scenario: template.scenarios[0] || 'Simulation A',
+          duration: template.duration * 60, // Convert minutes to seconds
+          settings: sessionSettings
+        })
+      });
+
+      if (!sessionResponse.ok) {
+        throw new Error('Failed to create session');
+      }
+
+      const sessionData = await sessionResponse.json();
+      console.log('✅ Session created:', sessionData.session.id);
+
+      // Create local session state for UI
       const newSession: ActiveSession = {
-        id: `session_${Date.now()}`,
+        id: sessionData.session.id,
         name: template.name,
         status: 'preparing',
         startTime: new Date(),
-        duration: sessionSettings.duration,
-        participants: onlineStudents,
+        duration: template.duration,
+        participants: students, // Include all students, they'll join when ready
         marketStatus: 'pre_market',
         currentPrice: 100.00,
         volume: 0,
@@ -291,28 +392,127 @@ export default function SessionControlDashboard({ user, classId }: SessionContro
       };
 
       setActiveSession(newSession);
+      
+      // Start the countdown sequence
+      await startSessionCountdown(newSession, template);
 
-      // Notify all online students to join session
-      if (socket) {
-        socket.emit('session_starting', {
-          sessionId: newSession.id,
-          templateId: template.id,
-          students: onlineStudents.map(s => s.id),
-          settings: sessionSettings
-        });
-      }
-
-      // Update student status
-      setStudents(prev => prev.map(student => 
-        onlineStudents.find(s => s.id === student.id)
-          ? { ...student, status: 'in_session' }
-          : student
-      ));
-
-      setActiveView('session');
     } catch (error) {
-      console.error('Failed to start session:', error);
-      alert('Failed to start session. Please try again.');
+      console.error('Error starting session:', error);
+      alert('Failed to start session: ' + error.message);
+    }
+  };
+
+  const startSessionCountdown = async (session: ActiveSession, template: SessionTemplate) => {
+    console.log('⏰ Starting session countdown...');
+    
+    // Update session status to show countdown
+    setActiveSession(prev => prev ? { ...prev, status: 'preparing' } : null);
+
+    // Broadcast countdown to all students
+    const countdown = [5, 4, 3, 2, 1];
+    for (const count of countdown) {
+      console.log(`🔔 Countdown: ${count}`);
+      // TODO: Send WebSocket message to all students
+      // if (socket) {
+      //   socket.emit('countdown', { count, sessionId: session.id });
+      // }
+      
+      // Wait 1 second
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+
+    console.log('🎯 Markets are open!');
+    
+    // Update session to active
+    setActiveSession(prev => prev ? { 
+      ...prev, 
+      status: 'active',
+      marketStatus: 'open',
+      startTime: new Date()
+    } : null);
+
+    // Execute lesson start commands
+    if (template.legacyLesson) {
+      await executeLessonCommands(session.id, template.legacyLesson);
+    }
+  };
+
+  const executeLessonCommands = async (sessionId: string, legacyLesson: any) => {
+    try {
+      console.log(`📜 Executing lesson commands for: ${legacyLesson.lessonName}`);
+      
+      const token = localStorage.getItem('auth_token');
+      
+      // Load the full lesson XML to get commands
+      const lessonResponse = await fetch(`/api/lessons/legacy`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          action: 'LOAD_LESSON',
+          lessonId: legacyLesson.lessonId
+        })
+      });
+
+      if (lessonResponse.ok) {
+        const lessonData = await lessonResponse.json();
+        const lesson = lessonData.lesson;
+        
+        console.log(`⚙️ Found ${lesson.globalCommands?.length || 0} global commands`);
+        
+        // Execute global privilege commands first
+        if (lesson.globalCommands) {
+          for (const command of lesson.globalCommands) {
+            if (command.type === 'GRANT_PRIVILEGE') {
+              console.log(`🔑 Granting privilege ${command.parameters[0]}: ${command.description}`);
+              
+              // Call privileges API to grant privilege
+              await fetch('/api/privileges', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                  sessionId: sessionId,
+                  action: 'GRANT',
+                  privilegeCode: command.parameters[0],
+                  targetRole: command.targetRole || '$All'
+                })
+              });
+            }
+          }
+        }
+
+        // Execute scenario-specific start commands
+        const scenario = lesson.simulations?.[legacyLesson.scenarios?.[0]] || lesson.simulations?.['Simulation A'];
+        if (scenario?.startCommands) {
+          console.log(`🎬 Executing ${scenario.startCommands.length} start commands for ${scenario.id}`);
+          
+          for (const command of scenario.startCommands) {
+            console.log(`📋 Command: ${command.type} - ${command.description}`);
+            
+            // Execute command via session management API
+            await fetch(`/api/sessions/${sessionId}`, {
+              method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({
+                action: 'EXECUTE_COMMAND',
+                command: command
+              })
+            });
+          }
+        }
+        
+        console.log('✅ Lesson commands executed successfully');
+      }
+    } catch (error) {
+      console.error('Error executing lesson commands:', error);
     }
   };
 
@@ -477,11 +677,12 @@ export default function SessionControlDashboard({ user, classId }: SessionContro
                 <select 
                   value={selectedTemplate} 
                   onChange={(e) => setSelectedTemplate(e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2"
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-black bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                  style={{ color: '#000000' }}
                 >
-                  <option value="">Choose a template...</option>
+                  <option value="" style={{ color: '#000000' }}>Choose a template...</option>
                   {sessionTemplates.map((template) => (
-                    <option key={template.id} value={template.id}>
+                    <option key={template.id} value={template.id} style={{ color: '#000000' }}>
                       {template.name} ({formatDuration(template.duration)})
                     </option>
                   ))}
@@ -498,22 +699,34 @@ export default function SessionControlDashboard({ user, classId }: SessionContro
                         <p className="text-sm text-gray-600 mt-1">{template.description}</p>
                         <div className="grid grid-cols-2 gap-4 mt-3 text-sm">
                           <div>
-                            <span className="text-gray-500">Duration:</span>
-                            <span className="ml-2 font-medium">{formatDuration(template.duration)}</span>
+                            <span className="text-gray-500">Runtime:</span>
+                            <span className="ml-2 font-medium">~6 minutes</span>
                           </div>
                           <div>
-                            <span className="text-gray-500">Difficulty:</span>
-                            <span className="ml-2 font-medium capitalize">{template.difficulty}</span>
+                            <span className="text-gray-500">Scenarios:</span>
+                            <span className="ml-2 font-medium">{template.scenarios.length}</span>
                           </div>
                           <div>
-                            <span className="text-gray-500">Max Students:</span>
-                            <span className="ml-2 font-medium">{template.maxStudents}</span>
+                            <span className="text-gray-500">Category:</span>
+                            <span className="ml-2 font-medium">{template.category.replace('_', ' ')}</span>
                           </div>
                           <div>
-                            <span className="text-gray-500">Markets:</span>
-                            <span className="ml-2 font-medium">{template.markets.join(', ')}</span>
+                            <span className="text-gray-500">Students Ready:</span>
+                            <span className="ml-2 font-medium text-green-600">{students.filter(s => s.status === 'online').length}</span>
                           </div>
                         </div>
+                        {template.scenarios.length > 0 && (
+                          <div className="mt-2">
+                            <span className="text-xs text-gray-500">Simulations: </span>
+                            <span className="text-xs text-gray-600">{template.scenarios.join(', ')}</span>
+                          </div>
+                        )}
+                        {template.privileges.length > 0 && (
+                          <div className="mt-2">
+                            <span className="text-xs text-gray-500">Trading Features: </span>
+                            <span className="text-xs text-gray-600">{template.privileges.slice(0, 3).join(', ')}{template.privileges.length > 3 ? ` +${template.privileges.length - 3} more` : ''}</span>
+                          </div>
+                        )}
                       </div>
                     ) : null;
                   })()}
@@ -521,19 +734,6 @@ export default function SessionControlDashboard({ user, classId }: SessionContro
               )}
 
               <div className="space-y-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Session Duration (minutes)
-                  </label>
-                  <input 
-                    type="number" 
-                    value={sessionSettings.duration}
-                    onChange={(e) => setSessionSettings(prev => ({ ...prev, duration: parseInt(e.target.value) }))}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2"
-                    min="5"
-                    max="180"
-                  />
-                </div>
                 
                 <div className="space-y-2">
                   <label className="flex items-center">
@@ -561,9 +761,9 @@ export default function SessionControlDashboard({ user, classId }: SessionContro
             <button 
               onClick={startNewSession}
               disabled={!selectedTemplate || activeSession !== null}
-              className="w-full bg-blue-600 text-white py-3 px-4 rounded-md font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-green-600 text-white py-3 px-4 rounded-md font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-lg"
             >
-              {activeSession ? 'Session Already Active' : 'Start Session'}
+              🚀 {activeSession ? 'Session Already Running' : 'START LIVE TRADING'}
             </button>
           </div>
 
@@ -711,7 +911,7 @@ export default function SessionControlDashboard({ user, classId }: SessionContro
               <input 
                 type="text" 
                 placeholder="Send message to all students..."
-                className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm"
+                className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm text-black bg-white"
                 onKeyPress={(e) => {
                   if (e.key === 'Enter') {
                     broadcastMessage((e.target as HTMLInputElement).value);
@@ -761,12 +961,237 @@ export default function SessionControlDashboard({ user, classId }: SessionContro
       )}
 
       {activeView === 'analytics' && (
-        <div className="bg-white shadow rounded-lg p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Session Analytics</h3>
-          <p className="text-gray-600">
-            Real-time analytics and reporting will appear here during active sessions.
-            Historical session data and performance metrics will also be available.
-          </p>
+        <div className="space-y-6">
+          {/* Real-time Analytics Header */}
+          <div className="bg-white shadow rounded-lg p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium text-gray-900">Live Analytics Dashboard</h3>
+              <div className="flex items-center space-x-4">
+                {activeSession && (
+                  <>
+                    <div className="text-sm text-gray-500">
+                      Session: <span className="font-medium">{activeSession.name}</span>
+                    </div>
+                    <div className={`px-2 py-1 rounded text-xs font-medium ${
+                      activeSession.status === 'active' ? 'bg-green-100 text-green-800' :
+                      activeSession.status === 'paused' ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-blue-100 text-blue-800'
+                    }`}>
+                      {activeSession.status}
+                    </div>
+                  </>
+                )}
+                <button className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">
+                  Export Data
+                </button>
+              </div>
+            </div>
+            
+            {activeSession ? (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <h4 className="font-medium text-blue-900">Total Trades</h4>
+                  <p className="text-2xl font-bold text-blue-600">
+                    {students.reduce((sum, student) => sum + student.totalTrades, 0)}
+                  </p>
+                </div>
+                <div className="bg-green-50 p-4 rounded-lg">
+                  <h4 className="font-medium text-green-900">Total Volume</h4>
+                  <p className="text-2xl font-bold text-green-600">
+                    ${activeSession.volume.toLocaleString()}
+                  </p>
+                </div>
+                <div className="bg-purple-50 p-4 rounded-lg">
+                  <h4 className="font-medium text-purple-900">Avg P&L</h4>
+                  <p className="text-2xl font-bold text-purple-600">
+                    ${(students.reduce((sum, student) => sum + student.pnl, 0) / students.length).toFixed(2)}
+                  </p>
+                </div>
+                <div className="bg-orange-50 p-4 rounded-lg">
+                  <h4 className="font-medium text-orange-900">Market Price</h4>
+                  <p className="text-2xl font-bold text-orange-600">
+                    ${activeSession.currentPrice.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                No active session. Start a session to view real-time analytics.
+              </div>
+            )}
+          </div>
+
+          {/* Student Performance Grid */}
+          {activeSession && (
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* Top Performers */}
+              <div className="bg-white shadow rounded-lg p-6">
+                <h4 className="text-lg font-medium text-gray-900 mb-4">Top Performers</h4>
+                <div className="space-y-3">
+                  {students
+                    .filter(s => s.status === 'in_session')
+                    .sort((a, b) => b.pnl - a.pnl)
+                    .slice(0, 5)
+                    .map((student, index) => (
+                      <div key={student.id} className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                        <div className="flex items-center space-x-3">
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                            index === 0 ? 'bg-yellow-400 text-yellow-900' :
+                            index === 1 ? 'bg-gray-300 text-gray-700' :
+                            index === 2 ? 'bg-orange-400 text-orange-900' :
+                            'bg-blue-100 text-blue-600'
+                          }`}>
+                            {index + 1}
+                          </div>
+                          <span className="font-medium">{student.name}</span>
+                        </div>
+                        <div className="text-right">
+                          <div className={`font-medium ${student.pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {student.pnl >= 0 ? '+' : ''}${student.pnl.toFixed(2)}
+                          </div>
+                          <div className="text-xs text-gray-500">{student.totalTrades} trades</div>
+                        </div>
+                      </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Most Active Traders */}
+              <div className="bg-white shadow rounded-lg p-6">
+                <h4 className="text-lg font-medium text-gray-900 mb-4">Most Active Traders</h4>
+                <div className="space-y-3">
+                  {students
+                    .filter(s => s.status === 'in_session')
+                    .sort((a, b) => b.totalTrades - a.totalTrades)
+                    .slice(0, 5)
+                    .map((student, index) => (
+                      <div key={student.id} className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold">
+                            {index + 1}
+                          </div>
+                          <span className="font-medium">{student.name}</span>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-medium text-blue-600">{student.totalTrades} trades</div>
+                          <div className="text-xs text-gray-500">${student.currentBalance.toLocaleString()}</div>
+                        </div>
+                      </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Detailed Analytics Table */}
+          {activeSession && (
+            <div className="bg-white shadow rounded-lg p-6">
+              <h4 className="text-lg font-medium text-gray-900 mb-4">Detailed Student Analytics</h4>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Student
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Balance
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        P&L
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Trades
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Position
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Performance
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Risk Level
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {students
+                      .filter(s => s.status === 'in_session')
+                      .map((student) => {
+                        const returnRate = ((student.pnl / 100000) * 100); // Assuming 100k starting balance
+                        const riskLevel = student.totalTrades > 20 ? 'High' : student.totalTrades > 10 ? 'Medium' : 'Low';
+                        
+                        return (
+                          <tr key={student.id}>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center">
+                                <div className={`w-3 h-3 rounded-full mr-3 ${student.status === 'in_session' ? 'bg-green-400' : 'bg-gray-400'}`}></div>
+                                <div>
+                                  <div className="text-sm font-medium text-gray-900">{student.name}</div>
+                                  <div className="text-sm text-gray-500">{student.terminal}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              ${student.currentBalance.toLocaleString()}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm">
+                              <span className={student.pnl >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                {student.pnl >= 0 ? '+' : ''}${student.pnl.toFixed(2)}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {student.totalTrades}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {student.position}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm">
+                              <span className={returnRate >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                {returnRate >= 0 ? '+' : ''}{returnRate.toFixed(2)}%
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm">
+                              <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                riskLevel === 'High' ? 'bg-red-100 text-red-800' :
+                                riskLevel === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-green-100 text-green-800'
+                              }`}>
+                                {riskLevel}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Historical Sessions */}
+          <div className="bg-white shadow rounded-lg p-6">
+            <h4 className="text-lg font-medium text-gray-900 mb-4">Recent Sessions</h4>
+            <div className="text-gray-600">
+              <p className="mb-4">Historical session data will be displayed here, including:</p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Session completion rates and engagement metrics</li>
+                <li>Average student performance by lesson type</li>
+                <li>Trading pattern analysis and risk assessment</li>
+                <li>Learning outcome correlation with trading behavior</li>
+                <li>Comparative analysis across different class sections</li>
+              </ul>
+              <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+                <h5 className="font-medium text-blue-900">Advanced Analytics Coming Soon:</h5>
+                <ul className="text-sm text-blue-700 mt-2 space-y-1">
+                  <li>• Heat maps showing trading activity patterns</li>
+                  <li>• Behavioral analysis and learning curve visualization</li>
+                  <li>• Real-time collaboration and peer influence tracking</li>
+                  <li>• Automated assessment and feedback generation</li>
+                </ul>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

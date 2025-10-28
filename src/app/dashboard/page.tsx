@@ -51,6 +51,9 @@ export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null);
   const [classes, setClasses] = useState<Class[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [activeSession, setActiveSession] = useState<Session | null>(null);
+  const [countdownMessage, setCountdownMessage] = useState<string>('');
+  const [showJoinBanner, setShowJoinBanner] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const router = useRouter();
@@ -58,6 +61,55 @@ export default function DashboardPage() {
   useEffect(() => {
     checkAuth();
   }, []);
+
+  useEffect(() => {
+    // Poll for active sessions every 5 seconds
+    const pollForActiveSessions = async () => {
+      if (!user) return;
+      
+      try {
+        const token = localStorage.getItem('auth_token');
+        const response = await fetch('/api/sessions', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          const activeSessions = data.sessions.filter((session: Session) => 
+            session.status === 'IN_PROGRESS' || session.status === 'PENDING'
+          );
+          
+          if (activeSessions.length > 0 && !activeSession) {
+            const newActiveSession = activeSessions[0];
+            setActiveSession(newActiveSession);
+            setShowJoinBanner(true);
+            console.log(`🎯 New active session detected: ${newActiveSession.lesson.name}`);
+          } else if (activeSessions.length === 0 && activeSession) {
+            // Session ended
+            setActiveSession(null);
+            setShowJoinBanner(false);
+            setCountdownMessage('');
+            console.log('📝 Active session ended');
+          }
+        }
+      } catch (error) {
+        console.error('Error polling for active sessions:', error);
+      }
+    };
+
+    let pollInterval: NodeJS.Timeout;
+    if (user) {
+      pollInterval = setInterval(pollForActiveSessions, 5000); // Poll every 5 seconds
+    }
+
+    return () => {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
+    };
+  }, [user, activeSession]);
 
   const checkAuth = async () => {
     const token = localStorage.getItem('auth_token');
@@ -103,6 +155,35 @@ export default function DashboardPage() {
       if (sessionsResponse.ok) {
         const sessionsData = await sessionsResponse.json();
         setSessions(sessionsData.sessions);
+        
+        // Check for active sessions that student can join
+        const activeSessions = sessionsData.sessions.filter((session: Session) => 
+          session.status === 'IN_PROGRESS' || session.status === 'PENDING'
+        );
+        
+        if (activeSessions.length > 0) {
+          const activeSession = activeSessions[0]; // Join the first active session
+          setActiveSession(activeSession);
+          setShowJoinBanner(true);
+          console.log(`🎯 Active session detected: ${activeSession.lesson.name}`);
+        }
+      }
+      
+      // Also check specifically for active sessions for this user
+      const activeSessionResponse = await fetch('/api/sessions/active', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (activeSessionResponse.ok) {
+        const activeSessionData = await activeSessionResponse.json();
+        if (activeSessionData.session) {
+          console.log(`🔄 User already in active session: ${activeSessionData.session.lessonTitle}`);
+          // Auto-redirect to terminal if already in session
+          router.push(`/terminal?session=${activeSessionData.session.id}`);
+          return;
+        }
       }
 
     } catch (err: any) {
@@ -110,6 +191,49 @@ export default function DashboardPage() {
       router.push('/');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const joinLiveSession = async () => {
+    if (!activeSession || !user) return;
+    
+    try {
+      console.log(`🚀 Joining live session: ${activeSession.lesson.name}`);
+      setCountdownMessage('Joining session...');
+      
+      const token = localStorage.getItem('auth_token');
+      
+      // Join the session via API
+      const joinResponse = await fetch(`/api/sessions/${activeSession.id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          action: 'JOIN_SESSION',
+          userId: user.id
+        })
+      });
+      
+      if (joinResponse.ok) {
+        const joinData = await joinResponse.json();
+        console.log('✅ Successfully joined session');
+        
+        // Show countdown message
+        setCountdownMessage('Get ready! Session starting soon...');
+        
+        // Redirect to trading terminal
+        setTimeout(() => {
+          router.push(`/terminal?session=${activeSession.id}&lesson=${activeSession.lesson.name}`);
+        }, 2000);
+      } else {
+        console.error('Failed to join session');
+        setCountdownMessage('Failed to join session. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error joining session:', error);
+      setCountdownMessage('Error joining session. Please try again.');
     }
   };
 
@@ -212,6 +336,48 @@ export default function DashboardPage() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="space-y-8">
+          
+          {/* Live Session Join Banner */}
+          {showJoinBanner && activeSession && (
+            <div className="bg-gradient-to-r from-green-500 to-blue-600 rounded-lg shadow-lg p-6 text-white">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center">
+                    <div className="bg-white bg-opacity-20 rounded-full p-2 mr-4">
+                      <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold">🚀 Live Trading Session Available!</h3>
+                      <p className="text-green-100 mt-1">
+                        <strong>{activeSession.lesson.name}</strong> • {activeSession.scenario}
+                      </p>
+                      <p className="text-green-100 text-sm">
+                        Class: {activeSession.class.name} • Status: {activeSession.status}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {countdownMessage && (
+                    <div className="mt-3 bg-white bg-opacity-20 rounded-md p-3">
+                      <p className="text-sm font-medium">{countdownMessage}</p>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="ml-6">
+                  <button
+                    onClick={joinLiveSession}
+                    className="bg-white text-green-600 font-bold py-3 px-6 rounded-lg hover:bg-green-50 transition-colors shadow-lg"
+                    disabled={!!countdownMessage}
+                  >
+                    {countdownMessage ? 'Joining...' : 'JOIN LIVE TRADING'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           
           {/* Welcome Section */}
           <div className="bg-white rounded-lg shadow p-6">
