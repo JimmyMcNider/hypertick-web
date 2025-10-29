@@ -324,7 +324,7 @@ export class XMLLessonParser {
       for (const space of parentNode.space) {
         elements.push({
           type: 'space',
-          value: space.$.value ? parseInt(space.$.value) : undefined
+          value: space.$ && space.$.value ? parseInt(space.$.value) : undefined
         });
       }
     }
@@ -333,7 +333,7 @@ export class XMLLessonParser {
       for (const subtitle of parentNode.subtitle) {
         elements.push({
           type: 'subtitle',
-          properties: subtitle.$,
+          properties: subtitle.$ || {},
           children: this.parseContentElements(subtitle)
         });
       }
@@ -343,7 +343,7 @@ export class XMLLessonParser {
       for (const component of parentNode.component) {
         elements.push({
           type: 'component',
-          properties: component.$,
+          properties: component.$ || {},
           children: this.parseContentElements(component)
         });
       }

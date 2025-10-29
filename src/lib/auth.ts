@@ -294,10 +294,23 @@ export class AuthorizationService {
       isActive: true
     }));
 
-    await prisma.userPrivilege.createMany({
-      data: userPrivileges,
-      skipDuplicates: true
-    });
+    // Use individual upserts for SQLite compatibility
+    for (const userPrivilege of userPrivileges) {
+      await prisma.userPrivilege.upsert({
+        where: {
+          sessionId_userId_privilegeId: {
+            sessionId: userPrivilege.sessionId,
+            userId: userPrivilege.userId,
+            privilegeId: userPrivilege.privilegeId
+          }
+        },
+        update: {
+          isActive: true,
+          revokedAt: null
+        },
+        create: userPrivilege
+      });
+    }
   }
 
   /**
