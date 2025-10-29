@@ -9,6 +9,7 @@ import { EventEmitter } from 'events';
 import { prisma } from './prisma';
 import { XMLLessonParser, LessonConfig, Command } from './xml-parser';
 import { authzService } from './auth';
+import { getOrderMatchingEngine } from './order-matching-engine';
 
 export interface SessionState {
   id: string;
@@ -396,9 +397,14 @@ export class SessionEngine extends EventEmitter {
     const session = this.sessions.get(sessionId)!;
     const delay = (parameters[0] as number) || 0;
 
-    setTimeout(() => {
+    setTimeout(async () => {
       session.marketState.isOpen = true;
       this.sessions.set(sessionId, session);
+      
+      // Open the order matching engine market
+      const orderEngine = getOrderMatchingEngine(sessionId);
+      await orderEngine.openMarket();
+      
       this.emit('marketOpened', { sessionId });
     }, delay * 1000);
   }
@@ -410,6 +416,11 @@ export class SessionEngine extends EventEmitter {
     const session = this.sessions.get(sessionId)!;
     session.marketState.isOpen = false;
     this.sessions.set(sessionId, session);
+    
+    // Close the order matching engine market
+    const orderEngine = getOrderMatchingEngine(sessionId);
+    await orderEngine.closeMarket();
+    
     this.emit('marketClosed', { sessionId });
   }
 

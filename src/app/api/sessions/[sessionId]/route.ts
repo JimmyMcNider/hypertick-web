@@ -18,7 +18,7 @@ export const GET = requireAuth(async (
   { params }: RouteParams
 ) => {
   try {
-    const { sessionId } = params;
+    const { sessionId } = await params;
 
     // Check if we should attempt database connection
     if (!shouldAttemptDb()) {
@@ -114,7 +114,7 @@ export const PATCH = requireRole('INSTRUCTOR')(async (
   { params }: RouteParams
 ) => {
   try {
-    const { sessionId } = params;
+    const { sessionId } = await params;
     const body = await request.json();
     const { action, ...updateData } = body;
 
@@ -180,7 +180,7 @@ export const DELETE = requireRole('INSTRUCTOR')(async (
   { params }: RouteParams
 ) => {
   try {
-    const { sessionId } = params;
+    const { sessionId } = await params;
 
     // Verify instructor has access to this session
     const session = await prisma.simulationSession.findUnique({
@@ -227,7 +227,7 @@ export const POST = requireAuth(async (
   { params }: RouteParams
 ) => {
   try {
-    const { sessionId } = params;
+    const { sessionId } = await params;
     const body = await request.json();
     const { action, userId } = body;
 

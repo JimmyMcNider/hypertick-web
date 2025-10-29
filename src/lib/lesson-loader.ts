@@ -102,55 +102,30 @@ export class LessonLoader {
     }
 
     try {
-      const parser = new DOMParser();
-      const xmlDoc = parser.parseFromString(xmlContent, 'text/xml');
-      const lessonElement = xmlDoc.querySelector('lesson');
+      // Use the working XMLLessonParser for consistency
+      const { XMLLessonParser } = await import('./xml-parser');
+      const parser = new XMLLessonParser();
+      const parsedLesson = await parser.parseLesson(xmlContent);
       
-      if (!lessonElement) {
-        throw new Error('Invalid lesson XML: no lesson element found');
-      }
-
-      const lessonName = lessonElement.getAttribute('name') || 'Unknown Lesson';
-      
-      // Parse global commands
-      const globalCommands = this.parseGlobalCommands(lessonElement);
-      
-      // Parse market settings
-      const marketSettings = this.parseMarketSettings(lessonElement);
-      
-      // Parse admin panels
-      const adminPanels = this.parseAdminPanels(lessonElement);
-      
-      // Parse simulations
-      const simulations = this.parseSimulations(lessonElement);
-      
-      // Parse wizard items
-      const wizardItems = this.parseWizardItems(lessonElement);
-      
-      // Find initial wizard item
-      const initialWizardItem = this.findInitialWizardItem(lessonElement);
-      
-      // Define privilege mappings
-      const privileges = this.getPrivilegeDefinitions();
-
+      // Convert to the expected format
       return {
-        id: lessonName.replace(/\s+/g, '_').toUpperCase(),
-        name: lessonName,
-        globalCommands,
-        marketSettings,
-        adminPanels,
-        simulations,
-        wizardItems,
-        initialWizardItem,
-        privileges,
+        id: parsedLesson.name.replace(/\s+/g, '_').toUpperCase(),
+        name: parsedLesson.name,
+        globalCommands: [], // Will be populated from simulations start commands
+        marketSettings: parsedLesson.marketSettings,
+        adminPanels: parsedLesson.adminPanels,
+        simulations: parsedLesson.simulations,
+        wizardItems: parsedLesson.wizardItems,
+        initialWizardItem: '',
+        privileges: this.getPrivilegeDefinitions(),
         metadata: {
-          estimatedDuration: 90, // Price Formation typically 90 minutes
+          estimatedDuration: 90,
           difficulty: 'INTERMEDIATE',
           objectives: [
-            'Understand price formation mechanisms',
-            'Learn market maker vs speculator dynamics',
-            'Experience auction-based privilege allocation',
-            'Analyze market efficiency factors'
+            'Complete financial trading simulation',
+            'Learn market dynamics and pricing',
+            'Experience real-time order execution',
+            'Analyze portfolio performance'
           ]
         }
       };
