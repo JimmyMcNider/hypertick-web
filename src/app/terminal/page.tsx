@@ -42,7 +42,7 @@ interface SessionState {
   id: string;
   status: string;
   participants: any[];
-  marketState: {
+  marketState?: {
     isOpen: boolean;
     liquidityActive: boolean;
     currentPrice?: number;
@@ -474,7 +474,7 @@ export default function TradingTerminal() {
               SIMULATION: {simulationData.lessonName}
             </span>
           )}
-          {sessionState && (
+          {sessionState && sessionState.marketState && (
             <span className="flex items-center">
               MARKET: 
               <span className={`ml-1 ${sessionState.marketState.isOpen ? 'text-green-900' : 'text-red-900'}`}>
