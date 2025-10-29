@@ -4,6 +4,8 @@ import { PrismaClient, OrderStatus } from '@prisma/client';
 import { positionService } from './position-service';
 import { enhancedSessionEngine } from './enhanced-session-engine';
 import { lessonLoader } from './lesson-loader';
+import { getOrderMatchingEngine } from './order-matching-engine';
+import { getPortfolioEngine } from './portfolio-engine';
 
 const prisma = new PrismaClient();
 
@@ -64,6 +66,7 @@ export class TradingWebSocketServer {
     this.initializeMarketData();
     this.setupPositionServiceListeners();
     this.setupLessonEngineListeners();
+    this.setupNewEngineListeners();
   }
 
   private setupEventHandlers() {
@@ -115,6 +118,9 @@ export class TradingWebSocketServer {
             if (portfolio) {
               socket.emit('portfolio_update', portfolio);
             }
+
+            // Enhanced integration with new engines
+            await this.enhancedJoinSession(data.sessionId, data.userId, data.role);
 
             // Send current lesson state if applicable
             const sessionState = enhancedSessionEngine.getSession(data.sessionId);
@@ -386,56 +392,41 @@ export class TradingWebSocketServer {
         };
       }
 
-      // Determine initial order status based on type
-      let initialStatus: OrderStatus = OrderStatus.PENDING;
-      if (orderData.type === 'STOP' || orderData.type === 'STOP_LIMIT') {
-        initialStatus = OrderStatus.PENDING_TRIGGER; // Stop orders wait for trigger condition
-      }
+      // Get the order matching engine for this session
+      const orderEngine = getOrderMatchingEngine(sessionId);
 
-      // Create order in database
-      const order = await prisma.order.create({
-        data: {
-          sessionId,
-          userId: orderData.userId,
-          securityId: orderData.securityId,
-          side: orderData.side,
-          quantity: orderData.quantity,
-          price: orderData.price,
-          stopPrice: orderData.stopPrice,
-          type: orderData.type,
-          timeInForce: orderData.timeInForce,
-          status: initialStatus,
-          submittedAt: new Date()
-        },
-        include: {
-          user: true,
-          security: true
-        }
+      // Submit order to matching engine
+      const order = await orderEngine.submitOrder({
+        sessionId,
+        userId: orderData.userId,
+        securityId: orderData.securityId,
+        type: orderData.type,
+        side: orderData.side,
+        quantity: orderData.quantity,
+        price: orderData.price,
+        stopPrice: orderData.stopPrice,
+        timeInForce: orderData.timeInForce
       });
 
-      let trades: any[] = [];
-
-      // Process based on order type
-      if (orderData.type === 'MARKET' || orderData.type === 'LIMIT') {
-        // Regular market/limit orders can be matched immediately
-        trades = await this.matchOrder(order);
-      } else if (orderData.type === 'STOP' || orderData.type === 'STOP_LIMIT') {
-        // Stop orders remain pending until trigger condition is met
-        // In a real system, these would be monitored for price triggers
-        console.log(`Stop order ${order.id} created with trigger price ${orderData.stopPrice}`);
-      }
+      // Get order book update
+      const orderBook = orderEngine.getOrderBook(orderData.securityId);
+      const marketPrice = orderEngine.getMarketPrice(orderData.securityId);
 
       return {
         success: true,
         order,
-        trades,
-        marketUpdate: this.getMarketUpdate(orderData.symbol)
+        trades: [], // Trades are handled internally by the engine
+        marketUpdate: {
+          symbol: orderData.symbol,
+          lastPrice: marketPrice,
+          orderBook
+        }
       };
     } catch (error) {
       console.error('Order processing error:', error);
       return {
         success: false,
-        reason: 'Order processing failed'
+        reason: error.message || 'Order processing failed'
       };
     }
   }
@@ -859,6 +850,180 @@ export class TradingWebSocketServer {
 
   public getActiveUsers(sessionId: string): string[] {
     return Array.from(this.activeSessions.get(sessionId) || []);
+  }
+
+  /**
+   * Setup listeners for the new order matching and portfolio engines
+   */
+  private setupNewEngineListeners() {
+    // We'll setup listeners for each session as they connect
+    // This is a lightweight approach since engines are created per-session
+  }
+
+  /**
+   * Setup real-time integration for a specific session
+   */
+  private integrateSessionEngines(sessionId: string) {
+    try {
+      const orderEngine = getOrderMatchingEngine(sessionId);
+      const portfolioEngine = getPortfolioEngine(sessionId);
+
+      // Order engine events
+      orderEngine.on('orderExecuted', (data) => {
+        this.io.to(`session_${sessionId}`).emit('order_executed', {
+          orderId: data.order.id,
+          trades: data.executions,
+          timestamp: new Date()
+        });
+      });
+
+      orderEngine.on('tradeExecuted', (data) => {
+        this.io.to(`session_${sessionId}`).emit('trade_executed', {
+          securityId: data.securityId,
+          price: data.price,
+          quantity: data.quantity,
+          timestamp: data.timestamp
+        });
+
+        // Update our market data cache
+        if (data.securityId) {
+          const currentData = this.marketData.get(data.securityId) || {
+            symbol: data.securityId,
+            lastPrice: data.price,
+            bid: data.price * 0.999,
+            ask: data.price * 1.001,
+            bidSize: 100,
+            askSize: 100,
+            volume: 0,
+            tick: 0
+          };
+
+          currentData.lastPrice = data.price;
+          currentData.volume += data.quantity;
+          currentData.tick += 1;
+          currentData.bid = data.price * 0.999;
+          currentData.ask = data.price * 1.001;
+
+          this.marketData.set(data.securityId, currentData);
+
+          // Broadcast market data update
+          this.io.to(`session_${sessionId}`).emit('market_data', currentData);
+        }
+      });
+
+      orderEngine.on('orderRejected', (data) => {
+        this.io.to(`user_${data.order.userId}`).emit('order_rejected', {
+          orderId: data.order.id,
+          reason: data.reason || 'Order rejected',
+          timestamp: new Date()
+        });
+      });
+
+      // Portfolio engine events
+      portfolioEngine.on('positionUpdate', (data) => {
+        this.io.to(`user_${data.data.userId}`).emit('position_update', {
+          securityId: data.data.securityId,
+          quantity: data.data.quantity,
+          avgPrice: data.data.avgPrice,
+          marketValue: data.data.marketValue,
+          unrealizedPnL: data.data.unrealizedPnL,
+          realizedPnL: data.data.realizedPnL,
+          timestamp: data.timestamp
+        });
+
+        // Also send to instructors monitoring this session
+        this.io.to(`session_${sessionId}`).emit('participant_position_update', {
+          userId: data.data.userId,
+          securityId: data.data.securityId,
+          quantity: data.data.quantity,
+          marketValue: data.data.marketValue,
+          unrealizedPnL: data.data.unrealizedPnL
+        });
+      });
+
+      portfolioEngine.on('portfolioSummary', (data) => {
+        this.io.to(`user_${data.data.userId}`).emit('portfolio_update', {
+          totalValue: data.data.totalValue,
+          totalPnL: data.data.totalPnL,
+          totalUnrealizedPnL: data.data.totalUnrealizedPnL,
+          totalRealizedPnL: data.data.totalRealizedPnL,
+          cashBalance: data.data.cashBalance,
+          positions: data.data.positions,
+          timestamp: data.timestamp
+        });
+
+        // Send summary to instructors
+        this.io.to(`session_${sessionId}`).emit('participant_portfolio_update', {
+          userId: data.data.userId,
+          totalValue: data.data.totalValue,
+          totalPnL: data.data.totalPnL,
+          positionCount: data.data.positions.length
+        });
+      });
+
+      portfolioEngine.on('pnlUpdate', (data) => {
+        this.io.to(`user_${data.data.userId}`).emit('pnl_update', {
+          securityId: data.data.securityId,
+          oldUnrealizedPnL: data.data.oldUnrealizedPnL,
+          newUnrealizedPnL: data.data.newUnrealizedPnL,
+          priceChange: data.data.priceChange,
+          timestamp: data.timestamp
+        });
+      });
+
+      console.log(`Integrated engines for session ${sessionId}`);
+    } catch (error) {
+      console.error(`Error integrating engines for session ${sessionId}:`, error);
+    }
+  }
+
+  /**
+   * Enhanced join session that integrates with new engines
+   */
+  private async enhancedJoinSession(sessionId: string, userId: string, role: string) {
+    // Integrate engines for this session if not already done
+    this.integrateSessionEngines(sessionId);
+
+    // Initialize portfolio engine for this user if needed
+    const portfolioEngine = getPortfolioEngine(sessionId);
+    
+    // Send initial portfolio state
+    try {
+      const portfolio = await portfolioEngine.getPortfolioSummary(userId);
+      this.io.to(`user_${userId}`).emit('portfolio_update', {
+        totalValue: portfolio.totalValue,
+        totalPnL: portfolio.totalPnL,
+        totalUnrealizedPnL: portfolio.totalUnrealizedPnL,
+        totalRealizedPnL: portfolio.totalRealizedPnL,
+        cashBalance: portfolio.cashBalance,
+        positions: portfolio.positions,
+        timestamp: new Date()
+      });
+    } catch (error) {
+      console.error('Error sending initial portfolio state:', error);
+    }
+
+    // Send current order book state
+    try {
+      const orderEngine = getOrderMatchingEngine(sessionId);
+      
+      // Get order books for all securities in the session
+      const securities = ['cmhb0lc0u002rre59urb9dyow']; // TODO: Get from session
+      for (const securityId of securities) {
+        const orderBook = orderEngine.getOrderBook(securityId);
+        const marketPrice = orderEngine.getMarketPrice(securityId);
+        
+        this.io.to(`user_${userId}`).emit('orderbook_update', {
+          securityId,
+          bids: orderBook?.bids || [],
+          asks: orderBook?.asks || [],
+          marketPrice,
+          timestamp: new Date()
+        });
+      }
+    } catch (error) {
+      console.error('Error sending initial order book state:', error);
+    }
   }
 }
 
