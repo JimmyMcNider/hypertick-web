@@ -46,7 +46,6 @@ export async function GET(request: NextRequest) {
 
     const classes = await prisma.class.findMany({
       take: 5,
-      select: { id: true, name: true, semester: true },
       include: { instructor: { select: { username: true } } }
     });
 
@@ -74,7 +73,8 @@ export async function GET(request: NextRequest) {
         users: users.map(u => ({ id: u.id, username: u.username, role: u.role })),
         classes: classes.map(c => ({ 
           id: c.id, 
-          name: c.name, 
+          name: c.name,
+          semester: c.semester,
           instructor: c.instructor.username 
         })),
         securities: securities.map(s => ({ symbol: s.symbol, name: s.name }))
