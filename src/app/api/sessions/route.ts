@@ -97,22 +97,45 @@ export const POST = requireRole('INSTRUCTOR')(async (request: NextRequest & { us
     }
 
     // Create session through session engine
-    const session = await sessionEngine.createSession(
-      lessonId,
-      classId,
-      scenario,
-      request.user.id
-    );
+    console.log('🎯 Creating session with params:', { lessonId, classId, scenario, instructorId: request.user.id });
+    
+    try {
+      const session = await sessionEngine.createSession(
+        lessonId,
+        classId,
+        scenario,
+        request.user.id
+      );
 
-    return NextResponse.json({
-      message: 'Session created successfully',
-      session
-    });
+      console.log('✅ Session created successfully:', session.id);
+      return NextResponse.json({
+        message: 'Session created successfully',
+        session
+      });
+    } catch (sessionError: any) {
+      console.error('❌ Session engine error:', {
+        message: sessionError.message,
+        stack: sessionError.stack,
+        name: sessionError.name,
+        cause: sessionError.cause
+      });
+      throw sessionError; // Re-throw to be caught by outer catch
+    }
 
   } catch (error: any) {
-    console.error('Session creation error:', error);
+    console.error('💥 API route error:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      requestBody: { lessonId, classId, scenario },
+      userId: request.user?.id
+    });
+    
     return NextResponse.json(
-      { error: error.message || 'Failed to create session' },
+      { 
+        error: error.message || 'Failed to create session',
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      },
       { status: 400 }
     );
   }

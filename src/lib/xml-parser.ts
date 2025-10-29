@@ -128,14 +128,21 @@ export class XMLLessonParser {
    */
   async parseLesson(xmlContent: string): Promise<LessonConfig> {
     try {
+      console.log('🔍 XMLLessonParser.parseLesson() starting...');
+      console.log('📄 XML content length:', xmlContent.length);
+      
       const result = await parseXML(xmlContent) as any;
+      console.log('✅ XML parsing successful');
+      
       const lessonNode = result.lesson;
       
       if (!lessonNode) {
+        console.error('❌ Missing <lesson> root element in XML');
         throw new Error('Invalid lesson XML: missing <lesson> root element');
       }
 
       const lessonName = lessonNode.$.name || 'Unnamed Lesson';
+      console.log('📋 Parsing lesson:', lessonName);
       
       return {
         name: lessonName,

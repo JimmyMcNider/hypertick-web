@@ -107,25 +107,39 @@ export class SessionEngine extends EventEmitter {
     scenario: string,
     instructorId: string
   ): Promise<SessionState> {
-    // Get lesson configuration
-    const lesson = await prisma.lesson.findUnique({
-      where: { id: lessonId }
-    });
+    console.log('🔧 SessionEngine.createSession() starting...', { lessonId, classId, scenario, instructorId });
 
-    if (!lesson) {
-      throw new Error('Lesson not found');
-    }
+    try {
+      // Get lesson configuration
+      console.log('📚 Fetching lesson from database...');
+      const lesson = await prisma.lesson.findUnique({
+        where: { id: lessonId }
+      });
 
-    // Parse lesson XML
-    const lessonConfig = await this.xmlParser.parseLesson(lesson.xmlConfig);
-    const simulation = lessonConfig.simulations.find(s => s.id === scenario);
+      if (!lesson) {
+        console.error('❌ Lesson not found in database:', lessonId);
+        throw new Error('Lesson not found');
+      }
 
-    if (!simulation) {
-      throw new Error(`Simulation scenario ${scenario} not found`);
-    }
+      console.log('✅ Lesson found:', { id: lesson.id, name: lesson.name });
 
-    // Create session in database
-    const dbSession = await prisma.simulationSession.create({
+      // Parse lesson XML
+      console.log('📄 Parsing lesson XML configuration...');
+      const lessonConfig = await this.xmlParser.parseLesson(lesson.xmlConfig);
+      console.log('✅ XML parsed successfully. Simulations available:', lessonConfig.simulations.map(s => s.id));
+
+      const simulation = lessonConfig.simulations.find(s => s.id === scenario);
+
+      if (!simulation) {
+        console.error('❌ Simulation scenario not found:', { scenario, availableScenarios: lessonConfig.simulations.map(s => s.id) });
+        throw new Error(`Simulation scenario ${scenario} not found`);
+      }
+
+      console.log('✅ Simulation scenario found:', { id: simulation.id, duration: simulation.duration });
+
+      // Create session in database
+      console.log('💾 Creating session in database...');
+      const dbSession = await prisma.simulationSession.create({
       data: {
         lessonId,
         classId,
@@ -133,16 +147,22 @@ export class SessionEngine extends EventEmitter {
         duration: simulation.duration,
         status: 'PENDING'
       }
-    });
+      });
 
-    // Get class participants
-    const enrollments = await prisma.classEnrollment.findMany({
-      where: { classId },
-      include: { user: true }
-    });
+      console.log('✅ Database session created:', { id: dbSession.id, status: dbSession.status });
 
-    // Initialize session state
-    const sessionState: SessionState = {
+      // Get class participants
+      console.log('👥 Fetching class participants...');
+      const enrollments = await prisma.classEnrollment.findMany({
+        where: { classId },
+        include: { user: true }
+      });
+
+      console.log('✅ Class participants found:', enrollments.length);
+
+      // Initialize session state
+      console.log('🏗️ Initializing session state...');
+      const sessionState: SessionState = {
       id: dbSession.id,
       lessonId,
       classId,
@@ -172,14 +192,29 @@ export class SessionEngine extends EventEmitter {
       events: []
     };
 
-    // Store session in memory
-    this.sessions.set(dbSession.id, sessionState);
+      // Store session in memory
+      console.log('💾 Storing session in memory...');
+      this.sessions.set(dbSession.id, sessionState);
 
-    // Initialize session with lesson configuration
-    await this.initializeSession(dbSession.id, lessonConfig);
+      // Initialize session with lesson configuration
+      console.log('⚙️ Initializing session with lesson configuration...');
+      await this.initializeSession(dbSession.id, lessonConfig);
 
-    this.emit('sessionCreated', sessionState);
-    return sessionState;
+      console.log('🎉 Session created successfully:', sessionState.id);
+      this.emit('sessionCreated', sessionState);
+      return sessionState;
+
+    } catch (error) {
+      console.error('💥 SessionEngine.createSession() failed:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        lessonId,
+        classId,
+        scenario,
+        instructorId
+      });
+      throw error;
+    }
   }
 
   /**
