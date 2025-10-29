@@ -69,9 +69,13 @@ export const GET = requireAuth(async (request: NextRequest & { user: any }) => {
 
 // POST /api/sessions - Create new session (instructors only)
 export const POST = requireRole('INSTRUCTOR')(async (request: NextRequest & { user: any }) => {
+  let lessonId = '';
+  let classId = ''; 
+  let scenario = '';
+  
   try {
     const body = await request.json();
-    const { lessonId, classId, scenario } = body;
+    ({ lessonId, classId, scenario } = body);
 
     // Validate required fields
     if (!lessonId || !classId || !scenario) {
