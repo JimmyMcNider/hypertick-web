@@ -426,7 +426,7 @@ export class TradingWebSocketServer {
       console.error('Order processing error:', error);
       return {
         success: false,
-        reason: error.message || 'Order processing failed'
+        reason: error instanceof Error ? error.message : 'Order processing failed'
       };
     }
   }

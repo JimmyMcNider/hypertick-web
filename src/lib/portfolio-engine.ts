@@ -129,14 +129,14 @@ export class PortfolioEngine extends EventEmitter {
 
         if ((oldQuantity > 0 && quantityChange > 0) || (oldQuantity < 0 && quantityChange < 0)) {
           // Adding to position - update average price
-          const oldValue = oldQuantity * currentPosition.avgPrice;
+          const oldValue = oldQuantity * Number(currentPosition.avgPrice);
           const newValue = quantityChange * tradePrice;
           newAvgPrice = (oldValue + newValue) / newQuantity;
         } else {
           // Reducing position - realize P&L
           const closingQuantity = Math.min(Math.abs(quantityChange), Math.abs(oldQuantity));
-          realizedPnL = closingQuantity * (tradePrice - currentPosition.avgPrice) * (oldQuantity > 0 ? 1 : -1);
-          newAvgPrice = currentPosition.avgPrice; // Keep same avg price for remaining position
+          realizedPnL = closingQuantity * (tradePrice - Number(currentPosition.avgPrice)) * (oldQuantity > 0 ? 1 : -1);
+          newAvgPrice = Number(currentPosition.avgPrice); // Keep same avg price for remaining position
         }
       }
 

@@ -294,30 +294,22 @@ export class AuthorizationService {
       isActive: true
     }));
 
-    // Try PostgreSQL-optimized createMany first, fallback to individual upserts
-    try {
-      await prisma.userPrivilege.createMany({
-        data: userPrivileges,
-        skipDuplicates: true
+    // Use individual upserts for reliable cross-database compatibility
+    for (const userPrivilege of userPrivileges) {
+      await prisma.userPrivilege.upsert({
+        where: {
+          sessionId_userId_privilegeId: {
+            sessionId: userPrivilege.sessionId,
+            userId: userPrivilege.userId,
+            privilegeId: userPrivilege.privilegeId
+          }
+        },
+        update: {
+          isActive: true,
+          revokedAt: null
+        },
+        create: userPrivilege
       });
-    } catch (error) {
-      // Fallback for SQLite or unique constraint issues
-      for (const userPrivilege of userPrivileges) {
-        await prisma.userPrivilege.upsert({
-          where: {
-            sessionId_userId_privilegeId: {
-              sessionId: userPrivilege.sessionId,
-              userId: userPrivilege.userId,
-              privilegeId: userPrivilege.privilegeId
-            }
-          },
-          update: {
-            isActive: true,
-            revokedAt: null
-          },
-          create: userPrivilege
-        });
-      }
     }
   }
 

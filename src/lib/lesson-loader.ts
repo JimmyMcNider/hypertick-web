@@ -107,6 +107,59 @@ export class LessonLoader {
       const parser = new XMLLessonParser();
       const parsedLesson = await parser.parseLesson(xmlContent);
       
+      // Convert simulations array to object format
+      const simulationsObj: { [key: string]: LessonSimulation } = {};
+      parsedLesson.simulations.forEach((sim, index) => {
+        const simKey = sim.id || `simulation_${index + 1}`;
+        simulationsObj[simKey] = {
+          id: sim.id,
+          duration: sim.duration,
+          startCommands: sim.startCommands.map((cmd, cmdIndex) => ({
+            id: `${sim.id || `sim_${index}`}_start_${cmdIndex}`,
+            type: cmd.name as any,
+            parameters: cmd.parameters,
+            description: `Command: ${cmd.name}`
+          })),
+          endCommands: sim.endCommands.map((cmd, cmdIndex) => ({
+            id: `${sim.id || `sim_${index}`}_end_${cmdIndex}`,
+            type: cmd.name as any,
+            parameters: cmd.parameters,
+            description: `Command: ${cmd.name}`
+          })),
+          reportTemplates: sim.reports.map(report => ({
+            iteration: report.iteration,
+            pptTemplate: 'default-template.pptx'
+          }))
+        };
+      });
+
+      // Convert wizard items array to object format
+      const wizardItemsObj: { [key: string]: WizardItem } = {};
+      parsedLesson.wizardItems.forEach(item => {
+        wizardItemsObj[item.id] = {
+          id: item.id,
+          broadcast: item.broadcast,
+          background: item.centerPanel?.background || '#ffffff',
+          content: {
+            title: 'Wizard Item',
+            subtitle: '',
+            text: '',
+            bullets: [],
+            notes: []
+          },
+          navigation: {
+            nextEnabled: item.controller?.next?.enabled || false,
+            nextTarget: item.controller?.next?.nextWizardItem,
+            backEnabled: item.controller?.back?.enabled || false,
+            backTarget: undefined,
+            conditionalNext: (item.controller?.next?.conditions?.length && item.controller.next.conditions.length > 0) ? {
+              condition: item.controller.next.conditions[0].condition,
+              target: item.controller.next.conditions[0].cases?.[0]?.nextWizardItem || ''
+            } : undefined
+          }
+        };
+      });
+
       // Convert to the expected format
       return {
         id: parsedLesson.name.replace(/\s+/g, '_').toUpperCase(),
@@ -114,8 +167,8 @@ export class LessonLoader {
         globalCommands: [], // Will be populated from simulations start commands
         marketSettings: parsedLesson.marketSettings,
         adminPanels: parsedLesson.adminPanels,
-        simulations: parsedLesson.simulations,
-        wizardItems: parsedLesson.wizardItems,
+        simulations: simulationsObj,
+        wizardItems: wizardItemsObj,
         initialWizardItem: '',
         privileges: this.getPrivilegeDefinitions(),
         metadata: {
