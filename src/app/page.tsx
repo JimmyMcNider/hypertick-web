@@ -66,6 +66,34 @@ export default function HomePage() {
     });
   };
 
+  const handleDemoLogin = async () => {
+    setLoading(true);
+    setError('');
+    
+    try {
+      const response = await fetch('/api/auth/demo-login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Demo login failed');
+      }
+      
+      // Store token and redirect to instructor dashboard
+      localStorage.setItem('auth_token', data.token);
+      router.push('/instructor');
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 flex items-center justify-center p-4">
       <div className="max-w-md w-full">
@@ -212,11 +240,18 @@ export default function HomePage() {
           {/* Demo Account Info */}
           <div className="mt-6 p-4 bg-gray-50 rounded-md">
             <h3 className="text-sm font-medium text-gray-900 mb-2">Demo Accounts</h3>
-            <div className="text-xs text-gray-600 space-y-1">
+            <div className="text-xs text-gray-600 space-y-1 mb-3">
               <div><strong>Instructor:</strong> instructor / instructor123</div>
               <div><strong>Student:</strong> student1 / student123</div>
               <div><strong>Admin:</strong> admin / admin123</div>
             </div>
+            <button
+              onClick={handleDemoLogin}
+              disabled={loading}
+              className="w-full bg-green-600 text-white py-2 px-4 rounded-md text-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+            >
+              {loading ? 'Logging in...' : 'Quick Demo Login (Instructor)'}
+            </button>
           </div>
         </div>
 

@@ -9,9 +9,9 @@ import { lessonLoader } from '@/lib/lesson-loader';
 import { legacyLessonImporter } from '@/lib/legacy-lesson-importer';
 
 // GET /api/lessons - List available lessons (both database and XML lessons)
-export const GET = requireAuth(async (request: NextRequest & { user: any }) => {
+export async function GET(request: NextRequest) {
   try {
-    console.log('📚 Loading lessons for user:', request.user.username);
+    console.log('📚 Loading lessons (public access)');
 
     // Get legacy upTick lessons directly from XML files
     const legacyLessons = await legacyLessonImporter.scanLegacyLessons();
@@ -119,7 +119,7 @@ export const GET = requireAuth(async (request: NextRequest & { user: any }) => {
       { status: 500 }
     );
   }
-});
+}
 
 // POST /api/lessons - Load new XML lesson or save authored lesson
 export const POST = requireAuth(async (request: NextRequest & { user: any }) => {

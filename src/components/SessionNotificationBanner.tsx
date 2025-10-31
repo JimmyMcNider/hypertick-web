@@ -33,20 +33,25 @@ export default function SessionNotificationBanner() {
   const [activeSession, setActiveSession] = useState<ActiveSession | null>(null);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const [retryDelay, setRetryDelay] = useState(10000); // Start with 10 seconds
+  const [failedRequests, setFailedRequests] = useState(0);
   const router = useRouter();
 
   useEffect(() => {
     fetchNotifications();
     fetchActiveSession();
     
-    // Poll for updates every 10 seconds
+    // Poll for updates with exponential backoff on failures
     const interval = setInterval(() => {
-      fetchNotifications();
-      fetchActiveSession();
-    }, 10000);
+      // Stop polling if too many failures
+      if (failedRequests < 5) {
+        fetchNotifications();
+        fetchActiveSession();
+      }
+    }, retryDelay);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [retryDelay, failedRequests]);
 
   useEffect(() => {
     if (activeSession?.startTime && activeSession.status === 'IN_PROGRESS') {
@@ -81,9 +86,22 @@ export default function SessionNotificationBanner() {
           return notifTime > fiveMinutesAgo && !dismissed.has(notif.id);
         });
         setNotifications(recentNotifications);
+        
+        // Reset failure count on success
+        setFailedRequests(0);
+        setRetryDelay(10000);
+      } else if (response.status === 401) {
+        // Authentication failed, stop polling
+        setFailedRequests(10);
       }
     } catch (error) {
       console.error('Error fetching notifications:', error);
+      const newFailedCount = failedRequests + 1;
+      setFailedRequests(newFailedCount);
+      
+      // Exponential backoff: 10s, 20s, 40s, 60s max
+      const newDelay = Math.min(retryDelay * 2, 60000);
+      setRetryDelay(newDelay);
     }
   };
 
@@ -98,9 +116,22 @@ export default function SessionNotificationBanner() {
       if (response.ok) {
         const data = await response.json();
         setActiveSession(data.session);
+        
+        // Reset failure count on success
+        setFailedRequests(0);
+        setRetryDelay(10000);
+      } else if (response.status === 401) {
+        // Authentication failed, stop polling
+        setFailedRequests(10);
       }
     } catch (error) {
       console.error('Error fetching active session:', error);
+      const newFailedCount = failedRequests + 1;
+      setFailedRequests(newFailedCount);
+      
+      // Exponential backoff: 10s, 20s, 40s, 60s max
+      const newDelay = Math.min(retryDelay * 2, 60000);
+      setRetryDelay(newDelay);
     }
   };
 
