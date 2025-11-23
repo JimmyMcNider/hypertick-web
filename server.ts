@@ -1,8 +1,10 @@
 /**
  * Custom Next.js Server with WebSocket Support
- * 
+ *
  * Runs Next.js with a custom HTTP server to support WebSocket connections
  * for real-time trading simulation features
+ *
+ * This file is used for both development (via tsx) and production (compiled)
  */
 
 import { createServer } from 'http';
@@ -11,8 +13,11 @@ import next from 'next';
 import { initWebSocketServer } from './src/lib/websocket-server';
 
 const dev = process.env.NODE_ENV !== 'production';
-const hostname = 'localhost';
+const hostname = process.env.HOSTNAME || '0.0.0.0';
 const port = parseInt(process.env.PORT || '3000', 10);
+
+console.log(`Starting server in ${dev ? 'development' : 'production'} mode`);
+console.log(`Environment: NODE_ENV=${process.env.NODE_ENV}`);
 
 // Initialize Next.js app
 const app = next({ dev, hostname, port });
@@ -39,6 +44,7 @@ app.prepare().then(() => {
   server.listen(port, () => {
     console.log(`> Ready on http://${hostname}:${port}`);
     console.log(`> WebSocket server ready for connections`);
+    console.log(`> Database: ${process.env.DATABASE_URL ? 'Connected' : 'Not configured'}`);
   });
 
   // Graceful shutdown

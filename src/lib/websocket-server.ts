@@ -53,12 +53,18 @@ export class TradingWebSocketServer {
   private marketData: Map<string, MarketData> = new Map(); // symbol -> marketData
 
   constructor(server: HTTPServer) {
+    // Get allowed origins from environment variable or use defaults
+    const allowedOrigins = process.env.CORS_ORIGINS
+      ? process.env.CORS_ORIGINS.split(',').map(o => o.trim())
+      : process.env.NODE_ENV === 'production'
+        ? [process.env.NEXT_PUBLIC_APP_URL || 'https://hypertick-web.onrender.com']
+        : ['http://localhost:3000'];
+
     this.io = new SocketIOServer(server, {
       cors: {
-        origin: process.env.NODE_ENV === 'production' 
-          ? ['https://hypertick-web.onrender.com'] 
-          : ['http://localhost:3000'],
-        methods: ['GET', 'POST']
+        origin: allowedOrigins,
+        methods: ['GET', 'POST'],
+        credentials: true
       }
     });
 

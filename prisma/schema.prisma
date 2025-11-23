@@ -76,7 +76,7 @@ model ClassEnrollment {
 model Lesson {
   id          String   @id @default(cuid())
   name        String   @unique
-  xmlConfig   String   @db.Text
+  xmlConfig   String
   description String?
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
@@ -84,8 +84,64 @@ model Lesson {
 
   // Relationships
   sessions SimulationSession[]
+  commands LessonCommand[]
+  simulations LessonSimulation[]
+  wizardItems WizardItem[]
 
   @@map("lessons")
+}
+
+// XML Lesson Commands (Grant Privilege, Set Market, etc.)
+model LessonCommand {
+  id          String   @id @default(cuid())
+  lessonId    String
+  commandName String   // "Grant Privilege", "Set Market", etc.
+  parameters  Json     // Array of parameters
+  targetGroup String?  // "$Speculators", "$All", etc.
+  order       Int      // Execution order
+  createdAt   DateTime @default(now())
+
+  // Relationships
+  lesson Lesson @relation(fields: [lessonId], references: [id])
+
+  @@map("lesson_commands")
+}
+
+// Lesson Simulations (A, B, C variants)
+model LessonSimulation {
+  id           String   @id @default(cuid())
+  lessonId     String
+  simulationId String   // "Simulation A", "Simulation B", etc.
+  duration     Int      // Duration in seconds
+  startCommands Json    // Commands to run at start
+  endCommands   Json    // Commands to run at end  
+  reports       Json    // PowerPoint/reporting config
+  order        Int      // Display order
+  createdAt    DateTime @default(now())
+
+  // Relationships
+  lesson Lesson @relation(fields: [lessonId], references: [id])
+
+  @@map("lesson_simulations")
+}
+
+// Wizard Items (UI Flow Steps)
+model WizardItem {
+  id           String   @id @default(cuid())
+  lessonId     String
+  itemId       String   // "Introduction", "Auction1 Prep", etc.
+  title        String
+  content      Json     // Panel content, text, components
+  nextItems    Json     // Next wizard item mapping
+  broadcast    Boolean  @default(false)
+  background   String?  // Background color
+  order        Int      // Display order
+  createdAt    DateTime @default(now())
+
+  // Relationships
+  lesson Lesson @relation(fields: [lessonId], references: [id])
+
+  @@map("wizard_items")
 }
 
 model SimulationSession {

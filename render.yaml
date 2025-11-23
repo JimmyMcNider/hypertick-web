@@ -1,51 +1,33 @@
 # Render.com deployment configuration
-# Optimized for HyperTick trading simulation platform
-
-databases:
-  - name: hypertick-db
-    databaseName: hypertick
-    user: hypertick_user
-    plan: starter
+# HyperTick Trading Platform with Supabase PostgreSQL
+#
+# SETUP INSTRUCTIONS:
+# 1. Create a new Web Service in Render
+# 2. Connect your GitHub repo
+# 3. Add environment variables:
+#    - DATABASE_URL: Your Supabase connection string (from Supabase > Settings > Database)
+#    - JWT_SECRET: A secure random string (min 32 chars)
+#    - NEXT_PUBLIC_APP_URL: https://your-app.onrender.com
 
 services:
-  - type: redis
-    name: hypertick-redis
-    plan: starter
-    
   - type: web
     name: hypertick-web
-    env: node
+    runtime: node
     plan: starter
-    buildCommand: npm ci && npx prisma generate && npm run build
+    buildCommand: npm ci && npm run build
     startCommand: npm start
     healthCheckPath: /api/health
     autoDeploy: true
     envVars:
       - key: NODE_ENV
         value: production
+      - key: HOSTNAME
+        value: "0.0.0.0"
       - key: NEXT_TELEMETRY_DISABLED
         value: "1"
       - key: JWT_SECRET
         generateValue: true
-      - key: NEXTAUTH_SECRET
-        generateValue: true
-      - key: NEXTAUTH_URL
-        fromService:
-          type: web
-          name: hypertick-web
-          property: url
       - key: DATABASE_URL
-        fromDatabase:
-          name: hypertick-db
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: hypertick-redis
-          property: connectionString
-      - key: WEBSOCKET_PORT
-        value: "3001"
-      - key: ENABLE_FALLBACK_MODE
-        value: "true"
-      - key: DISABLE_EXTERNAL_APIS
-        value: "false"
+        sync: false  # Set manually from Supabase Dashboard
+      - key: NEXT_PUBLIC_APP_URL
+        sync: false  # Set after first deploy

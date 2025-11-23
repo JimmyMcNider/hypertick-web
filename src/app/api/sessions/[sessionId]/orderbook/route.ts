@@ -43,58 +43,89 @@ export const GET = requireAuth(async (
     // Get matching engine
     const engine = getOrderMatchingEngine(sessionId);
 
-    if (securityId) {
-      // Get order book for specific security
-      const orderBook = engine.getOrderBook(securityId);
-      const marketPrice = engine.getMarketPrice(securityId);
-
-      if (!orderBook) {
-        return NextResponse.json(
-          { error: 'Security not found' },
-          { status: 404 }
-        );
+    // If no securityId provided, try to get the default AOE security
+    let resolvedSecurityId = securityId;
+    if (!resolvedSecurityId) {
+      const aoeSecurity = await prisma.security.findFirst({
+        where: { symbol: 'AOE' }
+      });
+      if (aoeSecurity) {
+        resolvedSecurityId = aoeSecurity.id;
       }
+    }
+
+    if (resolvedSecurityId) {
+      // Get order book for specific security
+      const orderBook = engine.getOrderBook(resolvedSecurityId);
+      const marketPrice = engine.getMarketPrice(resolvedSecurityId);
+
+      // Also get raw orders from the engine for display
+      const rawOrders = engine.getOpenOrders(resolvedSecurityId);
+
+      // Separate into bids and asks with remaining quantity
+      const bids = rawOrders
+        .filter(o => o.side === 'BUY' && o.remainingQuantity > 0 && o.price !== undefined)
+        .map(o => ({
+          id: o.id,
+          price: o.price!,
+          remainingQuantity: o.remainingQuantity,
+          userId: o.userId
+        }))
+        .sort((a, b) => b.price - a.price);
+
+      const asks = rawOrders
+        .filter(o => o.side === 'SELL' && o.remainingQuantity > 0 && o.price !== undefined)
+        .map(o => ({
+          id: o.id,
+          price: o.price!,
+          remainingQuantity: o.remainingQuantity,
+          userId: o.userId
+        }))
+        .sort((a, b) => a.price - b.price);
+
+      // Calculate volume from recent trades
+      const recentTrades = engine.getRecentTrades(resolvedSecurityId);
+      const volume = recentTrades.reduce((sum, t) => sum + t.quantity, 0);
 
       return NextResponse.json({
         success: true,
         orderBook: {
-          securityId: orderBook.securityId,
+          securityId: resolvedSecurityId,
           marketPrice,
-          bids: orderBook.bids.map(level => ({
-            price: level.price,
-            quantity: level.quantity,
-            orderCount: level.orderCount
-          })),
-          asks: orderBook.asks.map(level => ({
-            price: level.price,
-            quantity: level.quantity,
-            orderCount: level.orderCount
-          })),
-          lastTrade: orderBook.lastTrade,
-          spread: orderBook.asks.length > 0 && orderBook.bids.length > 0 
-            ? orderBook.asks[0].price - orderBook.bids[0].price 
-            : null
+          bids,
+          asks,
+          stats: {
+            volume,
+            tradeCount: recentTrades.length,
+            bestBid: bids.length > 0 ? bids[0].price : null,
+            bestAsk: asks.length > 0 ? asks[0].price : null,
+            spread: bids.length > 0 && asks.length > 0
+              ? asks[0].price - bids[0].price
+              : null
+          },
+          lastTrade: orderBook?.lastTrade || null
         }
       });
     } else {
-      // Get all order books
-      const securities = ['EQUITY_1', 'BOND_1', 'OPTION_1']; // TODO: Get from session config
-      const orderBooks = securities.map(secId => {
-        const orderBook = engine.getOrderBook(secId);
-        const marketPrice = engine.getMarketPrice(secId);
-        
+      // Get all order books (legacy behavior)
+      const securities = await prisma.security.findMany({ where: { isActive: true } });
+      const orderBooks = securities.map(sec => {
+        const orderBook = engine.getOrderBook(sec.id);
+        const marketPrice = engine.getMarketPrice(sec.id);
+
         if (!orderBook) return null;
 
         return {
-          securityId: orderBook.securityId,
+          securityId: sec.id,
+          symbol: sec.symbol,
           marketPrice,
           bidCount: orderBook.bids.length,
           askCount: orderBook.asks.length,
           bestBid: orderBook.bids.length > 0 ? orderBook.bids[0].price : null,
           bestAsk: orderBook.asks.length > 0 ? orderBook.asks[0].price : null,
           lastTrade: orderBook.lastTrade,
-          spread: orderBook.asks.length > 0 && orderBook.bids.length > 0 
-            ? orderBook.asks[0].price - orderBook.bids[0].price 
+          spread: orderBook.asks.length > 0 && orderBook.bids.length > 0
+            ? orderBook.asks[0].price - orderBook.bids[0].price
             : null
         };
       }).filter(Boolean);

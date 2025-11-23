@@ -74,6 +74,14 @@ export class OrderMatchingEngine extends EventEmitter {
   private pendingOrders: Map<string, MarketOrder> = new Map();
   private marketMakers: Map<string, MarketMakerConfig> = new Map();
   private marketPrices: Map<string, number> = new Map();
+  private recentTrades: Map<string, Array<{
+    id: string;
+    price: number;
+    quantity: number;
+    buyOrderId: string;
+    sellOrderId: string;
+    timestamp: Date;
+  }>> = new Map();
   private isMarketOpen: boolean = false;
   private sessionId: string;
   private portfolioEngine: any;
@@ -375,6 +383,18 @@ export class OrderMatchingEngine extends EventEmitter {
     await this.updateOrderInDatabase(order1);
     await this.updateOrderInDatabase(order2);
 
+    // Record trade for history
+    const buyOrder = order1.side === 'BUY' ? order1 : order2;
+    const sellOrder = order1.side === 'SELL' ? order1 : order2;
+    this.recordTrade(order1.securityId, {
+      id: `trade_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      price,
+      quantity,
+      buyOrderId: buyOrder.id,
+      sellOrderId: sellOrder.id,
+      timestamp: new Date()
+    });
+
     // Update positions using portfolio engine
     const tradeValue = quantity * price;
     await this.portfolioEngine.updatePosition(
@@ -449,6 +469,13 @@ export class OrderMatchingEngine extends EventEmitter {
   }
 
   /**
+   * Check if market is currently open
+   */
+  isMarketCurrentlyOpen(): boolean {
+    return this.isMarketOpen;
+  }
+
+  /**
    * Get current order book for a security
    */
   getOrderBook(securityId: string): OrderBook | undefined {
@@ -471,6 +498,58 @@ export class OrderMatchingEngine extends EventEmitter {
    */
   getMarketPrice(securityId: string): number {
     return this.marketPrices.get(securityId) || 100.00;
+  }
+
+  /**
+   * Get all open orders for a security
+   */
+  getOpenOrders(securityId: string): MarketOrder[] {
+    const orders: MarketOrder[] = [];
+    for (const order of this.pendingOrders.values()) {
+      if (order.securityId === securityId &&
+          (order.status === 'PENDING' || order.status === 'PARTIALLY_FILLED') &&
+          order.remainingQuantity > 0) {
+        orders.push(order);
+      }
+    }
+    return orders;
+  }
+
+  /**
+   * Get recent trades for a security
+   */
+  getRecentTrades(securityId: string, limit: number = 100): Array<{
+    id: string;
+    price: number;
+    quantity: number;
+    buyOrderId: string;
+    sellOrderId: string;
+    timestamp: Date;
+  }> {
+    const trades = this.recentTrades.get(securityId) || [];
+    return trades.slice(-limit);
+  }
+
+  /**
+   * Record a trade (called after matching)
+   */
+  private recordTrade(securityId: string, trade: {
+    id: string;
+    price: number;
+    quantity: number;
+    buyOrderId: string;
+    sellOrderId: string;
+    timestamp: Date;
+  }): void {
+    if (!this.recentTrades.has(securityId)) {
+      this.recentTrades.set(securityId, []);
+    }
+    const trades = this.recentTrades.get(securityId)!;
+    trades.push(trade);
+    // Keep only last 1000 trades per security
+    if (trades.length > 1000) {
+      trades.shift();
+    }
   }
 
   /**
@@ -638,4 +717,29 @@ export function getOrderMatchingEngine(sessionId: string): OrderMatchingEngine {
     activeEngines.set(sessionId, new OrderMatchingEngine(sessionId));
   }
   return activeEngines.get(sessionId)!;
+}
+
+/**
+ * Get engine and ensure market is open for active sessions
+ * Use this for order submission to auto-open market for IN_PROGRESS sessions
+ */
+export async function getReadyOrderMatchingEngine(sessionId: string): Promise<OrderMatchingEngine> {
+  const engine = getOrderMatchingEngine(sessionId);
+
+  // Auto-open market if session is active
+  if (!engine.isMarketCurrentlyOpen()) {
+    try {
+      const session = await prisma.simulationSession.findUnique({
+        where: { id: sessionId }
+      });
+      if (session && session.status === 'IN_PROGRESS') {
+        await engine.openMarket();
+        console.log(`Auto-opened market for session ${sessionId}`);
+      }
+    } catch (error) {
+      console.error('Error checking session status:', error);
+    }
+  }
+
+  return engine;
 }

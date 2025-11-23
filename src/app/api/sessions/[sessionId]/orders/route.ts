@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { getOrderMatchingEngine } from '@/lib/order-matching-engine';
+import { getReadyOrderMatchingEngine } from '@/lib/order-matching-engine';
 import { prisma } from '@/lib/prisma';
 
 interface RouteParams {
@@ -39,6 +39,26 @@ export const POST = requireAuth(async (
       );
     }
 
+    // Resolve security - accept either ID or symbol
+    let resolvedSecurityId = securityId;
+
+    // Check if securityId looks like a symbol (not a cuid)
+    // CUIDs start with 'c' and are 25 chars, symbols are typically short uppercase
+    if (!securityId.startsWith('c') || securityId.length < 20) {
+      // Try to look up by symbol
+      const security = await prisma.security.findFirst({
+        where: { symbol: securityId.toUpperCase() }
+      });
+      if (security) {
+        resolvedSecurityId = security.id;
+      } else {
+        return NextResponse.json(
+          { error: `Security not found: ${securityId}` },
+          { status: 400 }
+        );
+      }
+    }
+
     // Validate user is in session
     const sessionUser = await prisma.sessionUser.findUnique({
       where: {
@@ -56,14 +76,14 @@ export const POST = requireAuth(async (
       );
     }
 
-    // Get matching engine
-    const engine = getOrderMatchingEngine(sessionId);
+    // Get matching engine (auto-opens market for active sessions)
+    const engine = await getReadyOrderMatchingEngine(sessionId);
 
-    // Submit order
+    // Submit order with resolved security ID
     const order = await engine.submitOrder({
       sessionId,
       userId: request.user.id,
-      securityId,
+      securityId: resolvedSecurityId,
       type,
       side,
       quantity,
