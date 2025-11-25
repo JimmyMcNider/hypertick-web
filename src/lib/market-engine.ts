@@ -7,6 +7,7 @@
  */
 
 import { getMarketConfig, MarketConfiguration, validateOrder, isFeatureEnabled } from './market-config';
+import { createMarketEfficiencyPattern, type LiquidityPattern, type PatternTradeConfig } from './market-efficiency-patterns';
 
 export interface MarketOrder {
   id: string;
@@ -100,6 +101,10 @@ export class MarketEngine {
   private symbols: string[] = [];
   private isPaused = false;
   private liquidityTradingInterval?: NodeJS.Timeout;
+
+  // Market Efficiency lesson specific
+  private marketEfficiencyPattern?: ReturnType<typeof createMarketEfficiencyPattern>;
+  private currentTick = 0;
   
   constructor(lessonId: string = 'Price Formation') {
     this.config = getMarketConfig(lessonId);
@@ -839,6 +844,94 @@ export class MarketEngine {
     console.log(`💧 Liquidity intensity adjusted to ${(this.config.liquidity.intensity * 100).toFixed(0)}%`);
   }
   
+  /**
+   * Initialize Market Efficiency lesson pattern
+   */
+  public initializeMarketEfficiencyPattern(scenario: string, initialPrice: number = 95.00): void {
+    console.log(`🎯 Initializing Market Efficiency pattern for ${scenario}`);
+    this.marketEfficiencyPattern = createMarketEfficiencyPattern(scenario);
+    this.currentTick = 0;
+
+    // Set initial price for bond
+    const bondSymbol = this.symbols.find(s => s.includes('BOND')) || this.symbols[0];
+    const marketData = this.marketData.get(bondSymbol);
+    if (marketData) {
+      marketData.currentPrice = initialPrice;
+      marketData.open24h = initialPrice;
+      marketData.low24h = initialPrice;
+      marketData.high24h = initialPrice;
+    }
+  }
+
+  /**
+   * Advance tick and execute Market Efficiency pattern trade
+   */
+  public advanceTick(): void {
+    if (!this.marketEfficiencyPattern) {
+      console.warn('No Market Efficiency pattern initialized');
+      return;
+    }
+
+    this.currentTick++;
+    const bondSymbol = this.symbols.find(s => s.includes('BOND')) || this.symbols[0];
+    const marketData = this.marketData.get(bondSymbol);
+
+    if (!marketData) {
+      console.warn(`Market data not found for ${bondSymbol}`);
+      return;
+    }
+
+    // Get pattern trade for this tick
+    let patternTrade: PatternTradeConfig | null = null;
+
+    // Different patterns use different methods
+    if ('getTradeForTick' in this.marketEfficiencyPattern) {
+      if (this.marketEfficiencyPattern.constructor.name === 'SawtoothPattern') {
+        patternTrade = (this.marketEfficiencyPattern as any).getTradeForTick(this.currentTick);
+      } else {
+        // Momentum or DeepMomentum pattern
+        patternTrade = (this.marketEfficiencyPattern as any).getTradeForTick(this.currentTick, marketData.currentPrice);
+      }
+    }
+
+    // Execute pattern trade
+    if (patternTrade) {
+      const price = patternTrade.priceOffset !== undefined
+        ? marketData.currentPrice + (patternTrade.priceOffset / 100)
+        : undefined;
+
+      this.placeOrder({
+        userId: 'liquidity_market_efficiency',
+        symbol: bondSymbol,
+        side: patternTrade.side,
+        quantity: patternTrade.quantity,
+        price,
+        type: price ? 'LIMIT' : 'MARKET',
+        isBot: true
+      });
+
+      console.log(`📊 Tick ${this.currentTick}: ${patternTrade.side} ${patternTrade.quantity} @ ${price ? `$${price.toFixed(2)}` : 'MKT'}`);
+    }
+  }
+
+  /**
+   * Get current tick (for Market Efficiency lessons)
+   */
+  public getCurrentTick(): number {
+    return this.currentTick;
+  }
+
+  /**
+   * Reset Market Efficiency pattern
+   */
+  public resetMarketEfficiencyPattern(): void {
+    if (this.marketEfficiencyPattern && 'reset' in this.marketEfficiencyPattern) {
+      (this.marketEfficiencyPattern as any).reset();
+      this.currentTick = 0;
+      console.log('🔄 Market Efficiency pattern reset');
+    }
+  }
+
   /**
    * Get market status for instructor monitoring
    */
